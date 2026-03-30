@@ -119,8 +119,8 @@ struct Grid_from_python {
         }
         if(info.isGPU && hasattr(t,"device") && hasattr(t.attr("device"), "index")) {
           int d = extract<int>(t.attr("device").attr("index"));
+          // Apple Silicon: single unified GPU device (always 0)
           int currd = 0;
-          LMG_CUDA_CHECK(cudaGetDevice(&currd));
           if(currd != d) {
             throw std::invalid_argument("Attempt to use GPU tensor on different device ("+itoa(d)+") than current device ("+itoa(currd)+").  Change location of tensor or change current device.");
           }

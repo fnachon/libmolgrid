@@ -91,7 +91,7 @@ class Transform {
      * (This is for vector quantities such as gradients and normals).
      */
     template <typename Dtype>
-    __host__ void forward(const Grid<Dtype, 2, true>& in, Grid<Dtype, 2, true>& out, bool dotranslate=true) const;
+    void forward(const Grid<Dtype, 2, true>& in, Grid<Dtype, 2, true>& out, bool dotranslate=true) const;
 
     // Docstring_Transform_backward_1
     /* \brief Apply inverse of 3D transformation on CPU.
@@ -109,7 +109,7 @@ class Transform {
      * @param[in] dotranslate if false only the inverse rotation is applied
      */
     template <typename Dtype>
-    __host__ void backward(const Grid<Dtype, 2, true>& in, Grid<Dtype, 2, true>& out, bool dotranslate=true) const;
+    void backward(const Grid<Dtype, 2, true>& in, Grid<Dtype, 2, true>& out, bool dotranslate=true) const;
 
     const Quaternion& get_quaternion() const { return Q; }
     float3 get_rotation_center() const { return center; }

@@ -10,7 +10,7 @@
 #include <random>
 #include <iostream>
 #include <boost/lexical_cast.hpp>
-#include <cuda_runtime.h>
+#include "libmolgrid/common.h"
 
 // dimensionalities up to but not including LIBMOLGRID_MAX_GRID_DIM are pre-instantiated
 #define LIBMOLGRID_MAX_GRID_DIM 9

@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -v \":0$\")",
+      "Bash(ls -la /Users/florian/Documents/Science-IA/libmolgrid/test/*.cu)",
+      "Bash(wc -l /Users/florian/Documents/Science-IA/libmolgrid/src/*.cu /Users/florian/Documents/Science-IA/libmolgrid/src/*.cpp)"
+    ]
+  }
+}

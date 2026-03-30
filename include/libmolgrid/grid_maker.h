@@ -12,7 +12,7 @@
 #include <vector>
 #include <array>
 #include <algorithm>
-#include <cuda_runtime.h>
+#include "libmolgrid/common.h"
 #include "libmolgrid/coordinateset.h"
 #include "libmolgrid/grid.h"
 #include "libmolgrid/example.h"
@@ -286,10 +286,7 @@ class GridMaker {
       float3 center = { 0, };
 
       for(unsigned i = 0; i < B; i++) {
-        if(isCUDA)
-          cudaMemcpy(&center, centers[i].data(), sizeof(center),cudaMemcpyDeviceToHost);
-        else
-          memcpy(&center, centers[i].data(), sizeof(center));
+        memcpy(&center, centers[i].data(), sizeof(center));
 
         //convert from subgrids to full grids
         Grid<float, 2, isCUDA> C = coords[i];
@@ -698,21 +695,8 @@ class GridMaker {
     CUDA_CALLABLE_MEMBER void accumulate_atom_gradient(float ax, float ay, float az,
             float x, float y, float z, float radius, float gridval, float3& agrad) const;
 
-    template<typename Dtype> __global__ friend //member functions don't kernel launch
-    void set_atom_gradients(GridMaker G, float3 grid_center, Grid2fCUDA coords, Grid1fCUDA type_index,
-        Grid1fCUDA radii, Grid<Dtype, 4, true> grid, Grid<Dtype, 2, true> atom_gradients);
-    template<typename Dtype, bool RadiiFromTypes> __global__ friend
-    void set_atom_type_gradients(GridMaker G, float3 grid_origin, Grid2fCUDA coords, Grid2fCUDA type_vector,
-        unsigned ntypes, Grid1fCUDA radii, Grid<Dtype, 4, true> grid, Grid<Dtype, 2, true> atom_gradients,
-        Grid<Dtype, 2, true> type_gradients);
-    template<typename Dtype, bool RadiiFromTypes> __global__ friend
-    void set_atom_type_grad_grad(GridMaker G, float3 grid_origin, Grid2fCUDA coords, Grid2fCUDA type_vector,
-        unsigned ntypes, Grid1fCUDA radii, Grid<Dtype, 4, true> diff, Grid<Dtype, 2, true> atom_gradients,
-        Grid<Dtype, 2, true> type_gradients, Grid<Dtype, 4, true> diffdiff, Grid<Dtype, 2, true> atom_diffdiff,
-        Grid<Dtype, 2, true> type_diffdiff);
-    template<typename Dtype> __global__ friend
-    void set_atom_relevance(GridMaker G, float3 grid_origin, Grid2fCUDA coords, Grid1fCUDA type_index,
-        Grid1fCUDA radii, Grid<Dtype, 4, true> densitygrid, Grid<Dtype, 4, true> diffgrid, Grid<Dtype, 1, true> relevance);
+    // Metal GPU kernels are free functions dispatched through MetalContext;
+    // no friend declarations needed (they access GridMaker via passed params).
 };
 
 } /* namespace libmolgrid */

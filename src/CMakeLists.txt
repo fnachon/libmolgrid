@@ -8,17 +8,18 @@ set( LIBMOLGRID_SOURCES
  example_provider.cpp
  example_dataset.cpp
  grid_maker.cpp
- grid_maker.cu
+ grid_maker_gpu.mm
  coordinateset.cpp
- coordinateset.cu
+ coordinateset_gpu.mm
  coord_cache.cpp
  transform.cpp
- transform.cu
+ transform_gpu.mm
  grid_io.cpp
  grid_interpolater.cpp
- grid_interpolater.cu
+ grid_interpolater_gpu.mm
  cartesian_grid.cpp
  string_cache.cpp
+ metal_context.mm
 )
 
 set( LIBMOLGRID_HEADERS
@@ -41,27 +42,79 @@ set( LIBMOLGRID_HEADERS
  ../include/libmolgrid/grid_io.h
  ../include/libmolgrid/cartesian_grid.h
  ../include/libmolgrid/string_cache.h
+ ../include/libmolgrid/metal_context.h
 )
 
 set ( LIBMOLGRID_HEADERS ${LIBMOLGRID_HEADERS}  PARENT_SCOPE)
-#include_directories (${Boost_INCLUDE_DIRS})
-#include_directories(${OPENBABEL3_INCLUDE_DIR})
 
 if(BUILD_SHARED)
     add_library(libmolgrid_shared SHARED ${LIBMOLGRID_HEADERS} ${LIBMOLGRID_SOURCES})
-    SET_TARGET_PROPERTIES(libmolgrid_shared PROPERTIES OUTPUT_NAME molgrid CUDA_SEPARABLE_COMPILATION OFF)
-    target_link_libraries(libmolgrid_shared ${OPENBABEL3_LIBRARIES} ${Boost_LIBRARIES} ${ZLIB_LIBRARIES})
+    SET_TARGET_PROPERTIES(libmolgrid_shared PROPERTIES OUTPUT_NAME molgrid)
+    target_link_libraries(libmolgrid_shared
+        ${OPENBABEL3_LIBRARIES}
+        ${Boost_LIBRARIES}
+        ${ZLIB_LIBRARIES}
+        "-framework Metal"
+        "-framework Foundation"
+    )
     install(TARGETS libmolgrid_shared DESTINATION lib)
 endif()
 
 if(BUILD_STATIC)
     add_library(libmolgrid_static STATIC ${LIBMOLGRID_HEADERS} ${LIBMOLGRID_SOURCES})
-    SET_TARGET_PROPERTIES(libmolgrid_static PROPERTIES OUTPUT_NAME molgrid CUDA_SEPARABLE_COMPILATION OFF POSITION_INDEPENDENT_CODE ON )
-    target_link_libraries(libmolgrid_static ${OPENBABEL3_LIBRARIES} ${Boost_LIBRARIES} ${ZLIB_LIBRARIES})
-    #install libs
+    SET_TARGET_PROPERTIES(libmolgrid_static PROPERTIES OUTPUT_NAME molgrid POSITION_INDEPENDENT_CODE ON)
+    target_link_libraries(libmolgrid_static
+        ${OPENBABEL3_LIBRARIES}
+        ${Boost_LIBRARIES}
+        ${ZLIB_LIBRARIES}
+        "-framework Metal"
+        "-framework Foundation"
+    )
     install(TARGETS libmolgrid_static DESTINATION lib)
 endif()
 
+# Compile Metal shaders → libmolgrid_shaders.metallib
+find_program(XCRUN xcrun REQUIRED)
 
-#install headers
-install(FILES ${LIBMOLGRID_HEADERS} ${PROJECT_BINARY_DIR}/include/libmolgrid/config.h DESTINATION include/libmolgrid)
+set(METAL_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/metal/shaders.metal)
+set(METAL_AIR    ${CMAKE_CURRENT_BINARY_DIR}/shaders.air)
+set(METAL_LIB    ${CMAKE_CURRENT_BINARY_DIR}/libmolgrid_shaders.metallib)
+
+# Pass the metallib path to metal_context.mm at compile time
+target_compile_definitions(libmolgrid_shared PRIVATE
+    METAL_LIBRARY_PATH="${CMAKE_CURRENT_BINARY_DIR}/libmolgrid_shaders.metallib")
+if(BUILD_STATIC)
+    target_compile_definitions(libmolgrid_static PRIVATE
+        METAL_LIBRARY_PATH="${CMAKE_CURRENT_BINARY_DIR}/libmolgrid_shaders.metallib")
+endif()
+
+add_custom_command(
+    OUTPUT  ${METAL_AIR}
+    COMMAND ${XCRUN} -sdk macosx metal
+            -std=metal3.0
+            -O2
+            -c ${METAL_SOURCE}
+            -o ${METAL_AIR}
+    DEPENDS ${METAL_SOURCE}
+    COMMENT "Compiling Metal shaders to AIR"
+)
+
+add_custom_command(
+    OUTPUT  ${METAL_LIB}
+    COMMAND ${XCRUN} -sdk macosx metallib ${METAL_AIR} -o ${METAL_LIB}
+    DEPENDS ${METAL_AIR}
+    COMMENT "Linking Metal AIR → metallib"
+)
+
+add_custom_target(metal_shaders ALL DEPENDS ${METAL_LIB})
+
+if(BUILD_SHARED)
+    add_dependencies(libmolgrid_shared metal_shaders)
+endif()
+if(BUILD_STATIC)
+    add_dependencies(libmolgrid_static metal_shaders)
+endif()
+
+install(FILES ${METAL_LIB} DESTINATION lib)
+install(FILES ${LIBMOLGRID_HEADERS} ${PROJECT_BINARY_DIR}/include/libmolgrid/config.h
+        DESTINATION include/libmolgrid)

@@ -1,24 +1,24 @@
 
 #Prep ourselves for compiling boost
 set(Boost_USE_STATIC_LIBS OFF) #unit_test_framework has to be shared
-find_package(Boost COMPONENTS unit_test_framework system REQUIRED)
+find_package(Boost COMPONENTS unit_test_framework REQUIRED)
 include_directories (${Boost_INCLUDE_DIRS})
 find_package(OpenBabel3 REQUIRED)
 include_directories(SYSTEM ${OPENBABEL3_INCLUDE_DIR})
 
-#get all cpp files
+#get all cpp/mm files
 set( TEST_SRCS
  test_coordinateset.cpp
  test_grid.cpp
- test_grid.cu
+ test_grid_mps.mm
  test_gridmaker.cpp
- test_gridmaker.cu
+ test_gridmaker_mps.mm
  test_gridinterp.cpp
  test_mgrid.cpp
- test_mgrid.cu
+ test_mgrid_mps.mm
  test_quaternion.cpp
  test_transform.cpp
- test_transform.cu
+ test_transform_mps.mm
 )
 
 #Run through each source
@@ -33,9 +33,11 @@ foreach(testSrc ${TEST_SRCS})
 
         #link to Boost libraries AND your targets and dependencies
         if(BUILD_STATIC)
-           target_link_libraries(${testName} libmolgrid_static ${Boost_LIBRARIES} ${CUDA_LIBRARIES})
+           target_link_libraries(${testName} libmolgrid_static ${Boost_LIBRARIES}
+               "-framework Metal" "-framework Foundation")
         else()
-           target_link_libraries(${testName} libmolgrid_shared ${Boost_LIBRARIES} ${CUDA_LIBRARIES})
+           target_link_libraries(${testName} libmolgrid_shared ${Boost_LIBRARIES}
+               "-framework Metal" "-framework Foundation")
         endif()
 
         #Finally add it to test execution -

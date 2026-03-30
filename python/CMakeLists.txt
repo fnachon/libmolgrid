@@ -11,10 +11,10 @@ if(BUILD_CONTAINED_PYTHON)
 endif()
 
 if(${CMAKE_VERSION} VERSION_LESS "3.12.0") 
-	find_package( Boost COMPONENTS system filesystem python${PYTHON_VERSION_MAJOR} REQUIRED )
+	find_package( Boost COMPONENTS filesystem python${PYTHON_VERSION_MAJOR} REQUIRED )
 else()
 #minor version numbers requires newer (3.12?) version of cmake   
-  find_package( Boost COMPONENTS system filesystem python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR} REQUIRED )
+  find_package( Boost COMPONENTS filesystem python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR} REQUIRED )
 endif()
 
 find_package( NumPy )
@@ -54,11 +54,14 @@ if(BUILD_CONTAINED_PYTHON)
   # create a python library with as few runtime dependencies as possible
   add_link_options("LINKER:--exclude-libs,ALL")  # avoid exporting stdc++ symbols
   add_library(molgrid SHARED ${PYMOLGRID_SOURCES})
-  target_link_libraries(molgrid ${Boost_LIBRARIES} ${CUDA_LIBRARIES} libmolgrid_static  -static-libstdc++ -static-libgcc)
+  target_link_libraries(molgrid ${Boost_LIBRARIES} ${PYTHON_LIBRARY}
+      libmolgrid_static "-framework Metal" "-framework Foundation"
+      -static-libstdc++ -static-libgcc)
 else()
 # create the lib
   add_library(molgrid SHARED ${PYMOLGRID_SOURCES})
-  target_link_libraries(molgrid ${Boost_LIBRARIES} ${CUDA_LIBRARIES} libmolgrid_shared)
+  target_link_libraries(molgrid ${Boost_LIBRARIES} ${PYTHON_LIBRARY}
+      libmolgrid_shared "-framework Metal" "-framework Foundation")
 endif()
 
 # Suppress prefix "lib" because Python does not allow this prefix

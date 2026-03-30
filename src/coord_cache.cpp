@@ -11,7 +11,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
-#include <cuda_runtime.h>
+#include "libmolgrid/common.h"
 #include <openbabel/obconversion.h>
 
 namespace libmolgrid {

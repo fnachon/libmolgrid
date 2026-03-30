@@ -79,4 +79,43 @@ namespace libmolgrid {
   template void GridInterpolater::checkGrids(const Grid<double, 4, false>& in, const Grid<double, 4, false>& out) const;
   template void GridInterpolater::checkGrids(const Grid<float, 4, true>& in, const Grid<float, 4, true>& out) const;
 
+  // ---------------------------------------------------------------------------
+  // Definitions previously in grid_interpolater.cu (CPU-callable)
+  // ---------------------------------------------------------------------------
+
+  template <typename Dtype, bool isCUDA>
+  Dtype GridInterpolater::get_pt(const Grid<Dtype, 3, isCUDA>& in, int x, int y, int z) const {
+    if (x < 0 || x >= int(in_dim) || y < 0 || y >= int(in_dim) || z < 0 || z >= int(in_dim))
+      return 0;
+    return in[x][y][z];
+  }
+
+  template <typename Dtype, bool isCUDA>
+  Dtype GridInterpolater::interpolate(const Grid<Dtype, 3, isCUDA>& in, float3 gridpt) const {
+    int xl = (int)floor(gridpt.x), xh = (int)ceil(gridpt.x);
+    int yl = (int)floor(gridpt.y), yh = (int)ceil(gridpt.y);
+    int zl = (int)floor(gridpt.z), zh = (int)ceil(gridpt.z);
+
+    Dtype p000 = get_pt(in,xl,yl,zl), p001 = get_pt(in,xl,yl,zh);
+    Dtype p010 = get_pt(in,xl,yh,zl), p011 = get_pt(in,xl,yh,zh);
+    Dtype p100 = get_pt(in,xh,yl,zl), p101 = get_pt(in,xh,yl,zh);
+    Dtype p110 = get_pt(in,xh,yh,zl), p111 = get_pt(in,xh,yh,zh);
+
+    Dtype xd = xh > xl ? (gridpt.x-xl)/(xh-xl) : 0;
+    Dtype yd = yh > yl ? (gridpt.y-yl)/(yh-yl) : 0;
+    Dtype zd = zh > zl ? (gridpt.z-zl)/(zh-zl) : 0;
+
+    Dtype c00 = p000*(1-xd) + p100*xd;
+    Dtype c01 = p001*(1-xd) + p101*xd;
+    Dtype c10 = p010*(1-xd) + p110*xd;
+    Dtype c11 = p011*(1-xd) + p111*xd;
+    Dtype c0  = c00*(1-yd)  + c10*yd;
+    Dtype c1  = c01*(1-yd)  + c11*yd;
+    return c0*(1-zd) + c1*zd;
+  }
+
+  template float  GridInterpolater::interpolate(const Grid<float,  3, true>&  in, float3 pt) const;
+  template float  GridInterpolater::interpolate(const Grid<float,  3, false>& in, float3 pt) const;
+  template double GridInterpolater::interpolate(const Grid<double, 3, false>& in, float3 pt) const;
+
 }

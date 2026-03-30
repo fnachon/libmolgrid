@@ -4,7 +4,7 @@
  *  Created on: Mar 22, 2019
  *      Author: dkoes
  */
-#include <cuda_runtime.h>
+#include "libmolgrid/common.h"
 
 #include "libmolgrid/coordinateset.h"
 #include "libmolgrid/atom_typer.h"

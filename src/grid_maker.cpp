@@ -8,8 +8,43 @@
 #include <cmath>
 #include <vector>
 #include <iomanip>
+#include <algorithm>
 
 namespace libmolgrid {
+
+// Helper used by calc_point specializations
+static inline float sqDistance(float3 pt, float x, float y, float z) {
+  float ret;
+  float tmp = pt.x - x; ret  = tmp * tmp;
+  tmp = pt.y - y;       ret += tmp * tmp;
+  tmp = pt.z - z;       ret += tmp * tmp;
+  return ret;
+}
+
+// Explicit specializations must appear before any implicit instantiation.
+template<>
+float GridMaker::calc_point<false>(float ax, float ay, float az, float ar,
+    const float3& grid_coords) const {
+  float rsq = sqDistance(grid_coords, ax, ay, az);
+  ar *= radius_scale;
+  float dist = sqrtf(rsq);
+  if (dist > ar * final_radius_multiple) return 0.0f;
+  if (dist <= ar * gaussian_radius_multiple) {
+    float ex = -2.0f * dist * dist / (ar * ar);
+    return expf(ex);
+  }
+  float dr = dist / ar;
+  float q = (A * dr + B) * dr + C;
+  return q > 0 ? q : 0;
+}
+
+template<>
+float GridMaker::calc_point<true>(float ax, float ay, float az, float ar,
+    const float3& grid_coords) const {
+  float rsq = sqDistance(grid_coords, ax, ay, az);
+  ar *= radius_scale;
+  return (rsq < ar * ar) ? 1.0f : 0.0f;
+}
 
 
 void GridMaker::initialize(float res, float d, bool bin, float rscale, float grm) {
@@ -709,5 +744,87 @@ template void GridMaker::backward_relevance(float3,  const Grid<float, 2, false>
 template void GridMaker::backward_relevance(float3,  const Grid<float, 2, false>&,
     const Grid<float, 1, false>&, const Grid<float, 1, false>&, const Grid<double, 4, false>&,
     const Grid<double, 4, false>& , Grid<double, 1, false>& ) const;
+
+// ---------------------------------------------------------------------------
+// Definitions previously in grid_maker.cu (non-kernel, CPU-callable functions)
+// ---------------------------------------------------------------------------
+
+uint2 GridMaker::get_bounds_1d(const float grid_origin,
+    float coord, float densityrad) const {
+  uint2 bounds{0, 0};
+  float low = coord - densityrad - grid_origin;
+  if (low > 0) bounds.x = (unsigned)floor(low / resolution);
+  float high = coord + densityrad - grid_origin;
+  if (high > 0) bounds.y = std::min(dim, (unsigned)ceil(high / resolution));
+  return bounds;
+}
+
+float GridMaker::type_grad_grad(float a, float x, float dist, float r) {
+  float dist2 = dist * dist;
+  if (dist > r * final_radius_multiple) return 0.0f;
+  if (dist <= r * gaussian_radius_multiple) {
+    float r2 = r * r;
+    float ex = -2.0f * dist2 / r2;
+    return 16*(a-x)*(a-x)*expf(ex)/(r2*r2) - 4*expf(ex)/(r2);
+  }
+  float ax = a - x, ax2 = ax * ax;
+  float term1 = -(E + D*dist/r)*ax2/(powf(dist2,1.5f)*r);
+  float term2 = D*ax2/(dist2*r*r);
+  float term3 = (E + D*dist/r)/(dist*r);
+  return term1 + term2 + term3;
+}
+
+float GridMaker::atom_density_grad_grad(float a, float x, float dist, float r) {
+  float dist2 = dist * dist;
+  if (dist > r * final_radius_multiple) return 0.0f;
+  if (dist <= r * gaussian_radius_multiple) {
+    float r2 = r * r;
+    float ex = -2.0f * dist2 / r2;
+    return 16*(a-x)*(a-x)*expf(ex)/(r2*r2) - 4*expf(ex)/(r2);
+  }
+  float ax = a - x, ax2 = ax * ax;
+  float term1 = -(E + D*dist/r)*ax2/(powf(dist2,1.5f)*r);
+  float term2 = D*ax2/(dist2*r*r);
+  float term3 = (E + D*dist/r)/(dist*r);
+  return term1 + term2 + term3;
+}
+
+float GridMaker::atom_density_grad_grad_other(float a, float x, float b, float y, float dist, float r) {
+  float dist2 = dist * dist;
+  if (dist > r * final_radius_multiple) return 0.0f;
+  if (dist <= r * gaussian_radius_multiple) {
+    float r2 = r * r;
+    float ex = -2.0f * dist2 / r2;
+    return 16*(a-x)*(b-y)*expf(ex)/(r2*r2);
+  }
+  float ax = a - x, by = b - y;
+  float term1 = -(E + D*dist/r)*ax*by/(powf(dist2,1.5f)*r);
+  float term2 = D*ax*by/(dist2*r*r);
+  return term1 + term2;
+}
+
+float GridMaker::density_grad_dist(float dist, float ar) const {
+  float dist2 = dist * dist;
+  if (dist > ar * final_radius_multiple) return NAN;
+  if (dist <= ar * gaussian_radius_multiple) {
+    float ex = -2.0f * dist2 / (ar * ar);
+    return (-4.0f * dist / (ar * ar)) * expf(ex);
+  }
+  return (D*dist/ar + E)/ar;
+}
+
+void GridMaker::accumulate_atom_gradient(float ax, float ay, float az,
+    float x, float y, float z, float ar, float gridval, float3& agrad) const {
+  float dist_x = x - ax, dist_y = y - ay, dist_z = z - az;
+  float dist2 = dist_x*dist_x + dist_y*dist_y + dist_z*dist_z;
+  double dist = sqrt(dist2);
+  ar *= radius_scale;
+  float agrad_dist = density_grad_dist(dist, ar);
+  if (dist > 0 && isfinite(agrad_dist)) {
+    agrad.x += -(dist_x / dist) * (agrad_dist * gridval);
+    agrad.y += -(dist_y / dist) * (agrad_dist * gridval);
+    agrad.z += -(dist_z / dist) * (agrad_dist * gridval);
+  }
+}
 
 }

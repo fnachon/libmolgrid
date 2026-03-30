@@ -35,7 +35,7 @@ If you use libmolgrid in your research, please cite:
 ### conda
 ```conda install -c gnina molgrid```
 
-### Build from Source
+### Build from Source (Linux / CUDA)
 
 ```apt install git build-essential libboost-all-dev python3-pip rapidjson-dev
 pip3 install numpy pytest pyquaternion
@@ -56,6 +56,50 @@ cd build
 cmake ..
 make -j8
 sudo make install
+```
+
+### Build from Source (macOS / Apple Silicon)
+
+libmolgrid supports Apple Silicon (M1/M2/M3/M4) via Metal Performance Shaders (MPS).
+GPU and CPU share unified memory, so no explicit host↔device copies are needed.
+
+**Prerequisites** (install via [Homebrew](https://brew.sh)):
+
+```bash
+brew install cmake boost open-babel rapidjson eigen python
+pip3 install numpy pytest pyquaternion
+```
+
+Xcode Command Line Tools are required for the Metal shader compiler (`metal`, `metallib`):
+
+```bash
+xcode-select --install
+```
+
+**Build:**
+
+```bash
+git clone https://github.com/gnina/libmolgrid.git
+cd libmolgrid
+mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(sysctl -n hw.logicalcpu)
+sudo make install
+```
+
+The build system detects Apple Silicon automatically and compiles the Metal shaders
+(`src/metal/shaders.metal`) into a `.metallib` that is embedded in the library.
+No CUDA installation is required.
+
+**Run tests** (must be run from the `build/bin/` directory so relative data paths resolve):
+
+```bash
+cd build/bin
+./test_gridmaker_cpp
+./test_gridmaker_mps_mm
+./test_grid_mps_mm
+./test_mgrid_mps_mm
+./test_transform_mps_mm
 ```
 
 

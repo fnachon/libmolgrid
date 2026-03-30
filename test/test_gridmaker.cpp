@@ -144,7 +144,7 @@ BOOST_AUTO_TEST_CASE(forward_gpu) {
   MGrid4f out(ntypes, grid_dims.x, grid_dims.y, grid_dims.z);
   Grid4fCUDA gpu_grid = out.gpu();
   size_t gsize = grid_dims.x * grid_dims.y * grid_dims.z * ntypes;
-  LMG_CUDA_CHECK(cudaMemset(gpu_grid.data(), 0, gsize * sizeof(float)));
+  memset(gpu_grid.data(), 0, gsize * sizeof(float));
   gmaker.forward(grid_center, coordgpu, gpu_grid);
   out.tocpu();
 

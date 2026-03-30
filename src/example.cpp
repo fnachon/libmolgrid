@@ -9,7 +9,7 @@
 #include <string>
 #include <unordered_set>
 #include <boost/algorithm/string.hpp>
-#include <cuda_runtime.h>
+#include "libmolgrid/common.h"
 
 #include "libmolgrid/example.h"
 
@@ -259,11 +259,7 @@ void Example::extract_labels(const vector<Example>& examples, Grid<float, 2, isC
   for(unsigned i = 0, n = examples.size(); i < n; i++) {
     const vector<float>& labels = examples[i].labels;
     if(labels.size() != nlabels) throw logic_error("Non-uniform number of labels: "+itoa(nlabels) +" vs "+ itoa(labels.size()));
-    if(isCUDA) {
-      LMG_CUDA_CHECK(cudaMemcpy(out[i].data(), &labels[0], sizeof(float)*nlabels, cudaMemcpyHostToDevice));
-    } else {
-      memcpy(out[i].data(), &labels[0], sizeof(float)*nlabels);
-    }
+    memcpy(out[i].data(), &labels[0], sizeof(float)*nlabels);
   }
 }
 
@@ -285,11 +281,7 @@ void Example::extract_label(const std::vector<Example>& examples, unsigned label
     if(labelpos >= examples[i].labels.size()) throw std::out_of_range("labelpos invalid (nonuniform labels): " +itoa(labelpos) + " >= " + itoa(examples[i].labels.size()));
     labels[i] = examples[i].labels[labelpos];
   }
-   if(isCUDA) {
-     LMG_CUDA_CHECK(cudaMemcpy(out.data(), &labels[0], sizeof(float)*N, cudaMemcpyHostToDevice));
-   } else {
-     memcpy(out.data(), &labels[0], sizeof(float)*N);
-   }
+   memcpy(out.data(), &labels[0], sizeof(float)*N);
 }
 
 template void Example::extract_label(const vector<Example>&, unsigned, Grid<float, 1, false>& );

@@ -1,6 +1,7 @@
 /** \file grid.h
  *
  *  Wrapper classes for holding dense, multi-dimensional arrays of data.
+ *  Ported from CUDA to Apple Silicon MPS (unified memory).
  */
 
 #ifndef GRID_H_
@@ -11,6 +12,8 @@
 #include <boost/lexical_cast.hpp>
 #include <cassert>
 #include <iostream>
+#include <cstring>
+#include <stdexcept>
 
 #include "libmolgrid/common.h"
 #include "libmolgrid/libmolgrid.h"
@@ -19,32 +22,15 @@ namespace libmolgrid {
 
 template<typename Dt, std::size_t ND> class ManagedGrid; //predeclare
 
-inline cudaMemcpyKind copyKind(bool srcCUDA, bool destCUDA) {
-  if (srcCUDA) {
-    if (destCUDA)
-      return cudaMemcpyDeviceToDevice;
-    else
-      return cudaMemcpyDeviceToHost;
-  } else { //source host
-    if (destCUDA)
-      return cudaMemcpyHostToDevice;
-    else
-      return cudaMemcpyHostToHost;
-  }
-}
-
 /**
  * \class Grid
- * A dense array of memory stored on the CPU.  The memory is owned
- * and managed external to this class.  The location and size of
- * the memory should not change during the lifetime of the grid.
- * If isCUDA is true, data should only be accessed in kernels.
+ * A dense array of memory. The memory is owned and managed external to this
+ * class. The isCUDA template parameter is kept for API compatibility; on
+ * Apple Silicon all memory is unified and accessible from both CPU and GPU.
  */
 template<typename Dtype, std::size_t NumDims, bool isCUDA = false>
 class Grid {
   protected:
-    //these should be read only, but I need to set them in the constructor
-    //outside an initializer list, so hide them
     Dtype * buffer; /// raw pointer to data
     size_t dims[NumDims];
     size_t offs[NumDims];
@@ -56,20 +42,16 @@ class Grid {
       size_t idx[NumDims] = { static_cast<size_t>(indices)...};
       size_t pos = 0;
       #pragma unroll
-      for(unsigned i = 0; i < NumDims; i++) { //surely the compiler will unroll this...
+      for(unsigned i = 0; i < NumDims; i++) {
         pos += idx[i]*offs[i];
       }
       return pos;
     }
 
     CUDA_CALLABLE_MEMBER void check_index(size_t i, size_t dim) const {
-#ifndef __CUDA_ARCH__
       if(i >= dim) {
         throw std::out_of_range("Invalid range. "+itoa(i) + " >= " + itoa(dim));
       }
-#else
-      assert(i < dim);
-#endif
     }
 
   public:
@@ -182,36 +164,29 @@ class Grid {
 
     /** \brief copy contents to dest
      *
-     *  Sizes should be the same, but will narrow as necessary.  Will copy across device/host.
+     *  On Apple Silicon all memory is unified; memcpy is sufficient for
+     *  both host-to-host and host-to-device copies.
      */
     template<bool destCUDA>
     size_t copyTo(Grid<Dtype,NumDims,destCUDA>& dest) const {
       size_t sz = std::min(size(), dest.size());
       if(sz == 0) return 0;
-      cudaMemcpyKind kind = copyKind(isCUDA,destCUDA);
-      LMG_CUDA_CHECK(cudaMemcpy(dest.data(),data(),sz*sizeof(Dtype),kind));
+      memcpy(dest.data(), data(), sz * sizeof(Dtype));
       return sz;
     }
 
-    /** \brief copy contents from src
-     *
-     *  Sizes should be the same, but will narrow as necessary.  Will copy across device/host.
-     */
+    /** \brief copy contents from src */
     template<bool srcCUDA>
     size_t copyFrom(const Grid<Dtype,NumDims,srcCUDA>& src) {
       size_t sz = std::min(size(), src.size());
       if(sz == 0) return 0;
-      cudaMemcpyKind kind = copyKind(srcCUDA,isCUDA);
-      LMG_CUDA_CHECK(cudaMemcpy(data(),src.data(),sz*sizeof(Dtype),kind));
+      memcpy(data(), src.data(), sz * sizeof(Dtype));
       return sz;
     }
 
-    /** \brief Set contents to zero.
-     *
-     */
+    /** \brief Set contents to zero. */
     void fill_zero() {
-      if(isCUDA) cudaMemset(data(), 0, sizeof(Dtype)*size());
-      else memset(data(), 0, sizeof(Dtype)*size());
+      memset(data(), 0, sizeof(Dtype) * size());
     }
 
     // constructor used by operator[], create a subgrid, assuming memory is allocated
@@ -227,8 +202,6 @@ class Grid {
 };
 
 // class specialization of grid to make final operator[] return scalar
-// Note: if we start adding more functionality to Grid, we will need
-// to refactor this into a separate GridAccessor class
 template<typename Dtype, bool isCUDA >
 class Grid<Dtype,1,isCUDA> {
   protected:
@@ -236,13 +209,9 @@ class Grid<Dtype,1,isCUDA> {
     size_t dims[1]; /// length of array
 
     CUDA_CALLABLE_MEMBER void check_index(size_t i, size_t dim) const {
-#ifndef __CUDA_ARCH__
       if(i >= dim) {
         throw std::out_of_range("Invalid range. "+ itoa(i) + " >= " + itoa(dim));
       }
-#else
-      assert(i < dim);
-#endif
     }
   public:
     using type = Dtype;
@@ -294,8 +263,7 @@ class Grid<Dtype,1,isCUDA> {
     }
 
     void fill_zero() {
-      if(isCUDA) cudaMemset(data(), 0, sizeof(Dtype)*size());
-      else memset(data(), 0, sizeof(Dtype)*size());
+      memset(data(), 0, sizeof(Dtype) * size());
     }
 
     //only called from regular Grid
@@ -308,8 +276,7 @@ class Grid<Dtype,1,isCUDA> {
     size_t copyTo(Grid<Dtype,1,destCUDA>& dest) const {
       size_t sz = std::min(size(), dest.size());
       if(sz == 0) return sz;
-      cudaMemcpyKind kind = copyKind(isCUDA,destCUDA);
-      LMG_CUDA_CHECK(cudaMemcpy(dest.data(),data(),sz*sizeof(Dtype),kind));
+      memcpy(dest.data(), data(), sz * sizeof(Dtype));
       return sz;
     }
 
@@ -317,8 +284,7 @@ class Grid<Dtype,1,isCUDA> {
     size_t copyFrom(const Grid<Dtype,1,srcCUDA>& src) {
       size_t sz = std::min(size(), src.size());
       if(sz == 0) return sz;
-      cudaMemcpyKind kind = copyKind(srcCUDA,isCUDA);
-      LMG_CUDA_CHECK(cudaMemcpy(data(),src.data(),sz*sizeof(Dtype),kind));
+      memcpy(data(), src.data(), sz * sizeof(Dtype));
       return sz;
     }
 
