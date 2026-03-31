@@ -1,9 +1,12 @@
-libmolgrid
-==========
-[![Github CI](https://github.com/gnina/libmolgrid/actions/workflows/CI.yml/badge.svg)](https://github.com/gnina/libmolgrid/actions)
-[![codecov](https://codecov.io/gh/gnina/libmolgrid/branch/master/graph/badge.svg?token=gUFisf34rf)](https://codecov.io/gh/gnina/libmolgrid)
+libmolgrid — macOS / Apple Silicon fork
+========================================
 
-libmolgrid is under active development, but should be suitable for use by early adopters.
+> **This is a macOS-only fork of libmolgrid** with GPU acceleration via
+> [Metal Performance Shaders (MPS)](https://developer.apple.com/documentation/metalperformanceshaders)
+> for Apple Silicon (M1/M2/M3/M4). The CUDA backend has been replaced by Metal.
+>
+> For Linux / CUDA support, and information, refer to the **original project**:
+> [https://gnina.github.io/libmolgrid/](https://gnina.github.io/libmolgrid/)
 
 If you use libmolgrid in your research, please cite:
 
@@ -22,48 +25,11 @@ If you use libmolgrid in your research, please cite:
 }
 ```
 
-## Documentation
+## Installation (macOS / Apple Silicon)
 
-[https://gnina.github.io/libmolgrid/](https://gnina.github.io/libmolgrid/)
+### Prerequisites
 
-## Installation
-
-### PIP
-
-```pip install molgrid```
-
-### conda
-```conda install -c gnina molgrid```
-
-### Build from Source (Linux / CUDA)
-
-```apt install git build-essential libboost-all-dev python3-pip rapidjson-dev
-pip3 install numpy pytest pyquaternion
-```
-
-[Install cmake 3.12 or higher.](https://cmake.org/install/)
-
-[Install CUDA.](https://developer.nvidia.com/cuda-downloads)
-
-[Install OpenBabel 3.0.](https://github.com/openbabel/openbabel)
-
-`apt install libeigen3-dev libboost-all-dev`
-
-```git clone https://github.com/gnina/libmolgrid.git
-cd libmolgrid
-mkdir build
-cd build
-cmake ..
-make -j8
-sudo make install
-```
-
-### Build from Source (macOS / Apple Silicon)
-
-libmolgrid supports Apple Silicon (M1/M2/M3/M4) via Metal Performance Shaders (MPS).
-GPU and CPU share unified memory, so no explicit host↔device copies are needed.
-
-**Prerequisites** (install via [Homebrew](https://brew.sh)):
+Install dependencies via [Homebrew](https://brew.sh):
 
 ```bash
 brew install cmake boost open-babel rapidjson eigen python
@@ -76,7 +42,7 @@ Xcode Command Line Tools are required for the Metal shader compiler (`metal`, `m
 xcode-select --install
 ```
 
-**Build:**
+### Build from Source
 
 ```bash
 git clone https://github.com/gnina/libmolgrid.git
@@ -87,11 +53,15 @@ make -j$(sysctl -n hw.logicalcpu)
 sudo make install
 ```
 
-The build system detects Apple Silicon automatically and compiles the Metal shaders
-(`src/metal/shaders.metal`) into a `.metallib` that is embedded in the library.
-No CUDA installation is required.
+The Metal shaders (`src/metal/shaders.metal`) are compiled automatically into a
+`.metallib` during the build. No CUDA installation is required.
 
-**Run tests** (must be run from the `build/bin/` directory so relative data paths resolve):
+On Apple Silicon, GPU and CPU share unified memory — no explicit host↔device
+copies occur at runtime.
+
+### Run Tests
+
+Tests must be run from the `build/bin/` directory so that relative data paths resolve correctly:
 
 ```bash
 cd build/bin
@@ -102,13 +72,10 @@ cd build/bin
 ./test_transform_mps_mm
 ```
 
-
-
-
 ## Example
-```
+
+```python
 import molgrid
-import pytest
 import numpy as np
 import torch
 import torch.nn as nn
@@ -154,36 +121,32 @@ def test_train_torch_cnn():
         if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
             init.xavier_uniform_(m.weight.data)
 
-    batch_size = 50
-    e = molgrid.ExampleProvider(data_root=datadir+"/structs",balanced=True,shuffle=True)
+    e = molgrid.ExampleProvider(data_root=datadir+"/structs", balanced=True, shuffle=True)
     e.populate(fname)
 
     gmaker = molgrid.GridMaker()
     dims = gmaker.grid_dimensions(e.num_types())
-    tensor_shape = (batch_size,)+dims
+    tensor_shape = (batch_size,) + dims
 
-    model = Net(dims).to('cuda')
+    model = Net(dims).to('mps')
     model.apply(weights_init)
 
     optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 
-    input_tensor = torch.zeros(tensor_shape, dtype=torch.float32, device='cuda')
+    input_tensor = torch.zeros(tensor_shape, dtype=torch.float32, device='mps')
     float_labels = torch.zeros(batch_size, dtype=torch.float32)
 
     losses = []
     for iteration in range(100):
-        #load data
         batch = e.next_batch(batch_size)
-        gmaker.forward(batch, input_tensor, 0, random_rotation=False) #not rotating since convergence is faster this way
+        gmaker.forward(batch, input_tensor, 0, random_rotation=False)
         batch.extract_label(0, float_labels)
-        labels = float_labels.long().to('cuda')
+        labels = float_labels.long().to('mps')
 
         optimizer.zero_grad()
         output = model(input_tensor)
-        loss = F.cross_entropy(output,labels)
+        loss = F.cross_entropy(output, labels)
         loss.backward()
         optimizer.step()
         losses.append(float(loss))
-
 ```
-
