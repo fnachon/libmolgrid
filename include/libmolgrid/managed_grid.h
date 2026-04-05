@@ -1,21 +1,12 @@
 /** \file managed_grid.h
  *
  * A grid that manages its own memory using a shared pointer.
- * Ported to Apple Silicon MPS (unified memory).
- *
- * On Apple Silicon the CPU and GPU share the same physical memory pool, so
- * there is no need for explicit host↔device copies.  The buffer is allocated
- * once with malloc() and remains accessible from both CPU and Metal GPU
- * kernels throughout its lifetime.
- *
- * The togpu() / tocpu() methods still exist (API compatibility) but they no
- * longer copy data; they simply record which side is "active" so that the
- * MetalContext can insert the appropriate synchronization barriers.
  */
 
 #ifndef MANAGED_GRID_H_
 #define MANAGED_GRID_H_
 
+#include <cstdlib>
 #include <memory>
 #include <utility>
 #include <boost/lexical_cast.hpp>
@@ -29,6 +20,9 @@ namespace libmolgrid
   template <typename Dtype>
   struct mgrid_buffer_data
   {
+#if LIBMOLGRID_USE_CUDA
+    Dtype *gpu_ptr;
+#endif
     bool sent_to_gpu;
   };
 
@@ -43,7 +37,6 @@ namespace libmolgrid
     static constexpr size_t N = NumDims;
 
   protected:
-    // On unified memory both views point at the same allocation.
     mutable gpu_grid_t gpu_grid;
     cpu_grid_t cpu_grid;
     std::shared_ptr<Dtype> cpu_ptr;
@@ -52,45 +45,64 @@ namespace libmolgrid
     using buffer_data = mgrid_buffer_data<Dtype>;
     mutable buffer_data *gpu_info = nullptr;
 
-    /// empty (unusable) grid
     ManagedGridBase() = default;
 
-    // Allocate unified memory and set up cpu/gpu grid views.
-    // The data is page-aligned (16 KB) so Metal's newBufferWithBytesNoCopy works correctly.
-    // The buffer_data header is allocated separately.
+    static void delete_buffer(void *ptr)
+    {
+#if LIBMOLGRID_USE_CUDA
+      buffer_data *data = (buffer_data *)(ptr)-1;
+      if (data->gpu_ptr != nullptr)
+      {
+        cudaFree(data->gpu_ptr);
+      }
+      free(data);
+#else
+      free(ptr);
+#endif
+    }
+
     void alloc_and_set_cpu(size_t sz)
     {
-      // Allocate the metadata header.
-      gpu_info = new buffer_data;
-      gpu_info->sent_to_gpu = false;
+#if LIBMOLGRID_USE_CUDA
+      void *buffer = malloc(sizeof(buffer_data) + sz * sizeof(Dtype));
+      Dtype *cpu_data = (Dtype *)((buffer_data *)buffer + 1);
 
-      if (sz == 0) {
-        buffer_data *info = gpu_info;
-        cpu_ptr = std::shared_ptr<Dtype>(nullptr, [info](Dtype*) { delete info; });
-        cpu_grid.set_buffer(nullptr);
-        gpu_grid.set_buffer(nullptr);
-        return;
-      }
-
-      // Allocate data with 16 KB page alignment for Metal zero-copy compatibility.
-      void *data = nullptr;
-      const size_t align = 16384;  // Apple Silicon page size
-      if (posix_memalign(&data, align, sz * sizeof(Dtype)) != 0 || !data) {
-        delete gpu_info;
-        gpu_info = nullptr;
-        throw std::runtime_error("Could not allocate " + itoa(sz * sizeof(Dtype)) +
-                                 " bytes of page-aligned CPU memory in ManagedGrid");
-      }
-
-      buffer_data *info = gpu_info;
-      cpu_ptr = std::shared_ptr<Dtype>((Dtype*)data, [info](Dtype* p) {
-        free(p);
-        delete info;
-      });
+      if (!buffer)
+        throw std::runtime_error("Could not allocate " + itoa(sz * sizeof(Dtype)) + " bytes of CPU memory in ManagedGrid");
+      cpu_ptr = std::shared_ptr<Dtype>(cpu_data, delete_buffer);
       cpu_grid.set_buffer(cpu_ptr.get());
-      // GPU grid points at the same allocation (unified memory).
+      gpu_info = (buffer_data *)buffer;
+      gpu_info->gpu_ptr = nullptr;
+      gpu_info->sent_to_gpu = false;
+#else
+      const size_t align = 16384;
+      const size_t bytes = sizeof(buffer_data) + sz * sizeof(Dtype);
+      void *buffer = nullptr;
+      if (posix_memalign(&buffer, align, bytes) != 0 || !buffer)
+        throw std::runtime_error("Could not allocate " + itoa(sz * sizeof(Dtype)) + " bytes of CPU memory in ManagedGrid");
+      gpu_info = static_cast<buffer_data *>(buffer);
+      gpu_info->sent_to_gpu = false;
+      Dtype *cpu_data = reinterpret_cast<Dtype *>(gpu_info + 1);
+      cpu_ptr = std::shared_ptr<Dtype>(cpu_data, [buffer](Dtype *) { ManagedGridBase<Dtype, NumDims>::delete_buffer(buffer); });
+      cpu_grid.set_buffer(cpu_ptr.get());
       gpu_grid.set_buffer(cpu_ptr.get());
+#endif
     }
+
+#if LIBMOLGRID_USE_CUDA
+    void alloc_and_set_gpu(size_t sz) const
+    {
+      if (gpu_info == nullptr)
+        throw std::runtime_error("Attempt to allocate gpu memory in empty ManagedGrid");
+      if (gpu_info->gpu_ptr != nullptr)
+        throw std::runtime_error("Attempt to reallocate gpu memory in ManagedGrid");
+      cudaError_t err = cudaMalloc(&gpu_info->gpu_ptr, sz * sizeof(Dtype));
+      cudaGetLastError();
+      if (err != cudaSuccess)
+        throw std::runtime_error("Could not allocate " + itoa(sz * sizeof(Dtype)) + " bytes of GPU memory in ManagedGrid");
+      gpu_grid.set_buffer(gpu_info->gpu_ptr);
+    }
+#endif
 
     template <typename... I, typename = typename std::enable_if<sizeof...(I) == NumDims>::type>
     ManagedGridBase(I... sizes) : gpu_grid(nullptr, sizes...), cpu_grid(nullptr, sizes...)
@@ -109,17 +121,24 @@ namespace libmolgrid
       gpu_info->sent_to_gpu = false;
     }
 
-    // helper for clone: duplicate memory
     void clone_ptrs()
     {
       if (capacity == 0)
         return;
 
       std::shared_ptr<Dtype> old = cpu_ptr;
-      buffer_data old_info = *gpu_info;
+      buffer_data oldgpu = *gpu_info;
       alloc_and_set_cpu(capacity);
       memcpy(cpu_ptr.get(), old.get(), sizeof(Dtype) * capacity);
-      gpu_info->sent_to_gpu = old_info.sent_to_gpu;
+      gpu_info->sent_to_gpu = oldgpu.sent_to_gpu;
+
+#if LIBMOLGRID_USE_CUDA
+      if (oldgpu.gpu_ptr && oldgpu.sent_to_gpu)
+      {
+        alloc_and_set_gpu(capacity);
+        LMG_CUDA_CHECK(cudaMemcpy(gpu_info->gpu_ptr, oldgpu.gpu_ptr, sizeof(Dtype) * capacity, cudaMemcpyDeviceToDevice));
+      }
+#endif
     }
 
   public:
@@ -133,74 +152,134 @@ namespace libmolgrid
 
     inline void fill_zero()
     {
-      memset(cpu_ptr.get(), 0, capacity * sizeof(Dtype));
+      if (ongpu())
+        gpu_grid.fill_zero();
+      else
+        cpu_grid.fill_zero();
     }
 
     template <typename... I>
     inline Dtype &operator()(I... indices)
     {
+      tocpu();
       return cpu_grid(indices...);
     }
 
     template <typename... I>
     inline Dtype operator()(I... indices) const
     {
+      tocpu();
       return cpu_grid(indices...);
     }
 
-    /** \brief Copy data into dest. */
     size_t copyTo(cpu_grid_t &dest) const
     {
       size_t sz = std::min(size(), dest.size());
-      if (sz == 0) return 0;
-      memcpy(dest.data(), cpu_grid.data(), sz * sizeof(Dtype));
+      if (sz == 0)
+        return 0;
+      if (ongpu())
+      {
+#if LIBMOLGRID_USE_CUDA
+        LMG_CUDA_CHECK(cudaMemcpy(dest.data(), gpu_grid.data(), sz * sizeof(Dtype), cudaMemcpyDeviceToHost));
+#else
+        if (dest.data() != gpu_grid.data())
+          memcpy(dest.data(), gpu_grid.data(), sz * sizeof(Dtype));
+#endif
+      }
+      else
+      {
+        if (dest.data() != cpu_grid.data())
+          memcpy(dest.data(), cpu_grid.data(), sz * sizeof(Dtype));
+      }
       return sz;
     }
 
     size_t copyTo(gpu_grid_t &dest) const
     {
       size_t sz = std::min(size(), dest.size());
-      if (sz == 0) return 0;
-      // Unified memory: same buffer, just memcpy the pointer region if different.
-      if (dest.data() != cpu_grid.data())
-        memcpy(dest.data(), cpu_grid.data(), sz * sizeof(Dtype));
+      if (sz == 0)
+        return 0;
+      if (ongpu())
+      {
+#if LIBMOLGRID_USE_CUDA
+        LMG_CUDA_CHECK(cudaMemcpy(dest.data(), gpu_grid.data(), sz * sizeof(Dtype), cudaMemcpyDeviceToDevice));
+#else
+        if (dest.data() != gpu_grid.data())
+          memcpy(dest.data(), gpu_grid.data(), sz * sizeof(Dtype));
+#endif
+      }
+      else
+      {
+#if LIBMOLGRID_USE_CUDA
+        LMG_CUDA_CHECK(cudaMemcpy(dest.data(), cpu_grid.data(), sz * sizeof(Dtype), cudaMemcpyHostToDevice));
+#else
+        if (dest.data() != cpu_grid.data())
+          memcpy(dest.data(), cpu_grid.data(), sz * sizeof(Dtype));
+#endif
+      }
       return sz;
     }
 
     size_t copyTo(ManagedGridBase<Dtype, NumDims> &dest) const
     {
-      size_t sz = std::min(size(), dest.size());
-      if (sz == 0) return 0;
-      if (dest.cpu_ptr.get() != cpu_ptr.get())
-        memcpy(dest.cpu_ptr.get(), cpu_ptr.get(), sz * sizeof(Dtype));
-      return sz;
+      if (dest.ongpu())
+        return copyTo(dest.gpu_grid);
+      return copyTo(dest.cpu_grid);
     }
 
-    /** \brief Copy data from src. */
     size_t copyFrom(const cpu_grid_t &src)
     {
       size_t sz = std::min(size(), src.size());
-      if (sz == 0) return 0;
-      memcpy(cpu_grid.data(), src.data(), sz * sizeof(Dtype));
+      if (sz == 0)
+        return 0;
+      if (ongpu())
+      {
+#if LIBMOLGRID_USE_CUDA
+        LMG_CUDA_CHECK(cudaMemcpy(gpu_grid.data(), src.data(), sz * sizeof(Dtype), cudaMemcpyHostToDevice));
+#else
+        if (gpu_grid.data() != src.data())
+          memcpy(gpu_grid.data(), src.data(), sz * sizeof(Dtype));
+#endif
+      }
+      else
+      {
+        if (cpu_grid.data() != src.data())
+          memcpy(cpu_grid.data(), src.data(), sz * sizeof(Dtype));
+      }
       return sz;
     }
 
     size_t copyFrom(const gpu_grid_t &src)
     {
       size_t sz = std::min(size(), src.size());
-      if (sz == 0) return 0;
-      if (src.data() != cpu_grid.data())
-        memcpy(cpu_grid.data(), src.data(), sz * sizeof(Dtype));
+      if (sz == 0)
+        return 0;
+      if (ongpu())
+      {
+#if LIBMOLGRID_USE_CUDA
+        LMG_CUDA_CHECK(cudaMemcpy(gpu_grid.data(), src.data(), sz * sizeof(Dtype), cudaMemcpyDeviceToDevice));
+#else
+        if (gpu_grid.data() != src.data())
+          memcpy(gpu_grid.data(), src.data(), sz * sizeof(Dtype));
+#endif
+      }
+      else
+      {
+#if LIBMOLGRID_USE_CUDA
+        LMG_CUDA_CHECK(cudaMemcpy(cpu_grid.data(), src.data(), sz * sizeof(Dtype), cudaMemcpyDeviceToHost));
+#else
+        if (cpu_grid.data() != src.data())
+          memcpy(cpu_grid.data(), src.data(), sz * sizeof(Dtype));
+#endif
+      }
       return sz;
     }
 
     size_t copyFrom(const ManagedGridBase<Dtype, NumDims> &src)
     {
-      size_t sz = std::min(size(), src.size());
-      if (sz == 0) return 0;
-      if (src.cpu_ptr.get() != cpu_ptr.get())
-        memcpy(cpu_ptr.get(), src.cpu_ptr.get(), sz * sizeof(Dtype));
-      return sz;
+      if (src.ongpu())
+        return copyFrom(src.gpu_grid);
+      return copyFrom(src.cpu_grid);
     }
 
     size_t copyInto(size_t start, const ManagedGridBase<Dtype, NumDims> &src)
@@ -208,8 +287,46 @@ namespace libmolgrid
       size_t off = offset(0) * start;
       size_t sz = size() - off;
       sz = std::min(sz, src.size());
-      if (sz == 0) return 0;
-      memcpy(cpu_ptr.get() + off, src.cpu_ptr.get(), sz * sizeof(Dtype));
+      if (sz == 0)
+        return 0;
+      if (src.ongpu())
+      {
+        if (ongpu())
+        {
+#if LIBMOLGRID_USE_CUDA
+          LMG_CUDA_CHECK(cudaMemcpy(gpu_grid.data() + off, src.gpu_grid.data(), sz * sizeof(Dtype), cudaMemcpyDeviceToDevice));
+#else
+          if (gpu_grid.data() + off != src.gpu_grid.data())
+            memcpy(gpu_grid.data() + off, src.gpu_grid.data(), sz * sizeof(Dtype));
+#endif
+        }
+        else
+        {
+#if LIBMOLGRID_USE_CUDA
+          LMG_CUDA_CHECK(cudaMemcpy(cpu_grid.data() + off, src.gpu_grid.data(), sz * sizeof(Dtype), cudaMemcpyDeviceToHost));
+#else
+          if (cpu_grid.data() + off != src.gpu_grid.data())
+            memcpy(cpu_grid.data() + off, src.gpu_grid.data(), sz * sizeof(Dtype));
+#endif
+        }
+      }
+      else
+      {
+        if (ongpu())
+        {
+#if LIBMOLGRID_USE_CUDA
+          LMG_CUDA_CHECK(cudaMemcpy(gpu_grid.data() + off, src.data(), sz * sizeof(Dtype), cudaMemcpyHostToDevice));
+#else
+          if (gpu_grid.data() + off != src.data())
+            memcpy(gpu_grid.data() + off, src.data(), sz * sizeof(Dtype));
+#endif
+        }
+        else
+        {
+          if (cpu_grid.data() + off != src.data())
+            memcpy(cpu_grid.data() + off, src.data(), sz * sizeof(Dtype));
+        }
+      }
       return sz;
     }
 
@@ -223,7 +340,12 @@ namespace libmolgrid
         tmp.cpu_ptr = cpu_ptr;
         tmp.gpu_info = gpu_info;
         tmp.cpu_grid = cpu_grid_t(cpu_ptr.get(), sizes...);
+#if LIBMOLGRID_USE_CUDA
+        if (gpu_info)
+          tmp.gpu_grid = gpu_grid_t(gpu_info->gpu_ptr, sizes...);
+#else
         tmp.gpu_grid = gpu_grid_t(cpu_ptr.get(), sizes...);
+#endif
         tmp.capacity = capacity;
         return tmp;
       }
@@ -231,48 +353,99 @@ namespace libmolgrid
       {
         ManagedGrid<Dtype, NumDims> tmp(sizes...);
         if (size() > 0 && tmp.size() > 0)
+        {
+          if (ongpu())
+            tmp.togpu();
           copyTo(tmp);
+        }
         return tmp;
       }
     }
 
-    // ---- GPU / CPU view accessors ----
-    // On Apple Silicon unified memory: both views point at the same buffer.
-
-    const gpu_grid_t &gpu() const { togpu(); return gpu_grid; }
-    gpu_grid_t &gpu()             { togpu(); return gpu_grid; }
-
-    const cpu_grid_t &cpu() const { tocpu(); return cpu_grid; }
-    cpu_grid_t &cpu()             { tocpu(); return cpu_grid; }
-
-    /** \brief Mark memory as "on GPU". No data copy on unified memory. */
-    void togpu(bool /*dotransfer*/ = true) const
+    const gpu_grid_t &gpu() const
     {
-      if (capacity == 0) return;
-      // Ensure both views point at the shared buffer.
+      togpu();
+      return gpu_grid;
+    }
+    gpu_grid_t &gpu()
+    {
+      togpu();
+      return gpu_grid;
+    }
+
+    const cpu_grid_t &cpu() const
+    {
+      tocpu();
+      return cpu_grid;
+    }
+    cpu_grid_t &cpu()
+    {
+      tocpu();
+      return cpu_grid;
+    }
+
+    void togpu(bool dotransfer = true) const
+    {
+      if (capacity == 0)
+        return;
       if (gpu_grid.data() == nullptr)
-        gpu_grid.set_buffer(cpu_ptr.get());
+      {
+#if LIBMOLGRID_USE_CUDA
+        if (gpu_info->gpu_ptr == nullptr)
+        {
+          alloc_and_set_gpu(capacity);
+        }
+        size_t offset = cpu_grid.data() - cpu_ptr.get();
+        gpu_grid.set_buffer(gpu_info->gpu_ptr + offset);
+#else
+        size_t offset = cpu_grid.data() - cpu_ptr.get();
+        gpu_grid.set_buffer(cpu_ptr.get() + offset);
+#endif
+      }
+#if LIBMOLGRID_USE_CUDA
+      if (oncpu() && dotransfer)
+      {
+        LMG_CUDA_CHECK(cudaMemcpy(gpu_info->gpu_ptr, cpu_ptr.get(), capacity * sizeof(Dtype), cudaMemcpyHostToDevice));
+      }
+#else
+      (void)dotransfer;
+#endif
       if (gpu_info)
         gpu_info->sent_to_gpu = true;
     }
 
-    /** \brief Mark memory as "on CPU". No data copy on unified memory. */
-    void tocpu(bool /*dotransfer*/ = true) const
+    void tocpu(bool dotransfer = true) const
     {
+#if LIBMOLGRID_USE_CUDA
+      if (ongpu() && capacity > 0 && dotransfer)
+      {
+        LMG_CUDA_CHECK(cudaMemcpy(cpu_ptr.get(), gpu_info->gpu_ptr, capacity * sizeof(Dtype), cudaMemcpyDeviceToHost));
+      }
+#else
+      (void)dotransfer;
+#endif
       if (gpu_info)
         gpu_info->sent_to_gpu = false;
     }
 
-    bool ongpu() const { return gpu_info && gpu_info->sent_to_gpu; }
+    bool ongpu() const
+    {
+      bool ret = gpu_info && gpu_info->sent_to_gpu;
+      if (ret && gpu_grid.data() == nullptr)
+        togpu(false);
+      return ret;
+    }
+
     bool oncpu() const { return gpu_info == nullptr || !gpu_info->sent_to_gpu; }
 
     operator cpu_grid_t() const { return cpu(); }
-    operator cpu_grid_t &()     { return cpu(); }
+    operator cpu_grid_t &() { return cpu(); }
+
     operator gpu_grid_t() const { return gpu(); }
-    operator gpu_grid_t &()     { return gpu(); }
+    operator gpu_grid_t &() { return gpu(); }
 
     inline const Dtype *data() const { return cpu_ptr.get(); }
-    inline Dtype *data()             { return cpu_ptr.get(); }
+    inline Dtype *data() { return cpu_ptr.get(); }
 
     bool operator==(const ManagedGridBase<Dtype, NumDims> &rhs) const
     {
@@ -319,6 +492,7 @@ namespace libmolgrid
     template <class Archive>
     void save(Archive &ar, const unsigned int version) const
     {
+      this->tocpu();
       for (size_t i = 0; i < NumDims; i++)
         ar << this->dimension(i);
       ar << boost::serialization::make_array(this->data(), this->size());
@@ -339,11 +513,9 @@ namespace libmolgrid
 
   protected:
     friend ManagedGrid<Dtype, NumDims + 1>;
-    explicit ManagedGrid<Dtype, NumDims>(const ManagedGridBase<Dtype, NumDims + 1> &G, size_t i)
-        : ManagedGridBase<Dtype, NumDims>(G, i) {}
+    explicit ManagedGrid<Dtype, NumDims>(const ManagedGridBase<Dtype, NumDims + 1> &G, size_t i) : ManagedGridBase<Dtype, NumDims>(G, i) {}
   };
 
-  // Specialization for 1-D grids.
   template <typename Dtype>
   class ManagedGrid<Dtype, 1> : public ManagedGridBase<Dtype, 1>
   {
@@ -354,11 +526,29 @@ namespace libmolgrid
     ManagedGrid() = default;
     ManagedGrid(size_t sz) : ManagedGridBase<Dtype, 1>(sz) {}
 
-    inline Dtype &operator[](size_t i)       { return this->cpu_grid[i]; }
-    inline Dtype  operator[](size_t i) const { return this->cpu_grid[i]; }
+    inline Dtype &operator[](size_t i)
+    {
+      this->tocpu();
+      return this->cpu_grid[i];
+    }
 
-    inline Dtype &operator()(size_t a)       { return this->cpu_grid(a); }
-    inline Dtype  operator()(size_t a) const { return this->cpu_grid(a); }
+    inline Dtype operator[](size_t i) const
+    {
+      this->tocpu();
+      return this->cpu_grid[i];
+    }
+
+    inline Dtype &operator()(size_t a)
+    {
+      this->tocpu();
+      return this->cpu_grid(a);
+    }
+
+    inline Dtype operator()(size_t a) const
+    {
+      this->tocpu();
+      return this->cpu_grid(a);
+    }
 
     ManagedGrid<Dtype, 1> clone() const
     {
@@ -370,6 +560,7 @@ namespace libmolgrid
     template <class Archive>
     void save(Archive &ar, const unsigned int version) const
     {
+      this->tocpu();
       ar << this->dimension(0);
       ar << boost::serialization::make_array(this->data(), this->size());
     }
@@ -388,8 +579,7 @@ namespace libmolgrid
 
   protected:
     friend ManagedGrid<Dtype, 2>;
-    explicit ManagedGrid<Dtype, 1>(const ManagedGridBase<Dtype, 2> &G, size_t i)
-        : ManagedGridBase<Dtype, 1>(G, i) {}
+    explicit ManagedGrid<Dtype, 1>(const ManagedGridBase<Dtype, 2> &G, size_t i) : ManagedGridBase<Dtype, 1>(G, i) {}
   };
 
 #define EXPAND_MGRID_DEFINITIONS(Z, SIZE, _)       \

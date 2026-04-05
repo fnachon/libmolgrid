@@ -23,37 +23,37 @@ class Quaternion {
     fl d;
 
   public:
-     Quaternion()
+    CUDA_CALLABLE_MEMBER Quaternion()
         : a(1), b(0), c(0), d(0) {
     }
 
     /// Construct quaternion with real then unreal components
-     Quaternion(fl A, fl B, fl C, fl D)
+    CUDA_CALLABLE_MEMBER Quaternion(fl A, fl B, fl C, fl D)
         : a(A), b(B), c(C), d(D) {
     }
 
     /// Return the real or scalar part.
-     inline fl R_component_1() const {
+    CUDA_CALLABLE_MEMBER inline fl R_component_1() const {
       return a;
     }
 
     /// Return unreal[0]
-     inline fl R_component_2() const {
+    CUDA_CALLABLE_MEMBER inline fl R_component_2() const {
       return b;
     }
 
     /// Return unreal[1]
-     inline fl R_component_3() const {
+    CUDA_CALLABLE_MEMBER inline fl R_component_3() const {
       return c;
     }
 
     /// Return unreal[2]
-     inline fl R_component_4() const {
+    CUDA_CALLABLE_MEMBER inline fl R_component_4() const {
       return d;
     }
 
     /// In-place multiplication by scalar (element-wise)
-     Quaternion& operator *=(const fl &r) {
+    CUDA_CALLABLE_MEMBER Quaternion& operator *=(const fl &r) {
       a *= r;
       b *= r;
       c *= r;
@@ -62,7 +62,7 @@ class Quaternion {
     }
 
     /// In-place division by scalar (element-wise)
-     Quaternion& operator /=(const fl &r) {
+    CUDA_CALLABLE_MEMBER Quaternion& operator /=(const fl &r) {
       a /= r;
       b /= r;
       c /= r;
@@ -71,13 +71,12 @@ class Quaternion {
     }
 
     /// Division by scalar (element-wise)
-     Quaternion operator/(const fl &r) {
+    CUDA_CALLABLE_MEMBER Quaternion operator/(const fl &r) {
       return Quaternion(a/r,b/r,c/r,d/r);
     }
 
     /// Quaternion multiplication
-    
-     inline Quaternion operator*(const Quaternion& r) const {
+    CUDA_CALLABLE_MEMBER inline Quaternion operator*(const Quaternion& r) const {
       const fl ar = r.R_component_1();
       const fl br = r.R_component_2();
       const fl cr = r.R_component_3();
@@ -89,19 +88,18 @@ class Quaternion {
     }
 
     /// Quaternion in-place multiplication
-     Quaternion& operator*=(const Quaternion& r) {
+    CUDA_CALLABLE_MEMBER Quaternion& operator*=(const Quaternion& r) {
       *this = *this * r;
       return *this;
     }
 
     ///check bit level equality
-     bool operator==(const Quaternion& r) const {
+    CUDA_CALLABLE_MEMBER bool operator==(const Quaternion& r) const {
       return a == r.a && b == r.b && c == r.c && d == r.d;
     }
 
     /// Quaternion divison
-    
-    inline Quaternion operator/(const Quaternion& r) {
+    CUDA_CALLABLE_MEMBER inline Quaternion operator/(const Quaternion& r) {
       const fl ar = r.R_component_1();
       const fl br = r.R_component_2();
       const fl cr = r.R_component_3();
@@ -118,36 +116,35 @@ class Quaternion {
     }
 
     /// Quaternion in-place divison
-     Quaternion operator/=(const Quaternion &r) {
+    CUDA_CALLABLE_MEMBER Quaternion operator/=(const Quaternion &r) {
       *this = *this / r;
       return *this;
     }
 
     /// Conjugate
-     inline Quaternion conj() const {
+    CUDA_CALLABLE_MEMBER inline Quaternion conj() const {
       return Quaternion(+a, -b, -c,-d);
     }
 
-    
+    CUDA_CALLABLE_MEMBER
     float real() const {
       return R_component_1();
     }
 
     /// The Cayley norm - the square of the Euclidean norm
-    
-    inline float norm() const {
+    CUDA_CALLABLE_MEMBER inline float norm() const {
       return a*a+b*b+c*c+d*d;
     }
 
     /// Rotation point (x,y,z) using this quaternion.
-    float3 rotate(fl x, fl y, fl z) const {
+    CUDA_CALLABLE_MEMBER float3 rotate(fl x, fl y, fl z) const {
       Quaternion p(0, x, y, z);
       p = *this * p * (conj() / norm());
       return make_float3(p.R_component_2(), p.R_component_3(), p.R_component_4());
     }
 
     /// Rotate around the provided center and translate
-     inline float3 transform(fl x, fl y, fl z, float3 center, float3 translate) const {
+    CUDA_CALLABLE_MEMBER inline float3 transform(fl x, fl y, fl z, float3 center, float3 translate) const {
       float3 pt = rotate(x - center.x, y - center.y, z - center.z);
       x = pt.x + center.x + translate.x;
       y = pt.y + center.y + translate.y;
@@ -158,7 +155,7 @@ class Quaternion {
 
 
     /// Return inverse
-     Quaternion inverse() const {
+    CUDA_CALLABLE_MEMBER Quaternion inverse() const {
       fl nsq = a * a + b * b + c * c + d * d;
       return Quaternion(a / nsq, -b / nsq, -c / nsq, -d / nsq);
     }

@@ -1,11 +1,14 @@
-libmolgrid — macOS / Apple Silicon fork
-========================================
+libmolgrid fork with CUDA and Metal backends
+============================================
 
-> **This is a macOS-only fork of libmolgrid** with GPU acceleration via
-> [Metal Performance Shaders (MPS)](https://developer.apple.com/documentation/metalperformanceshaders)
-> for Apple Silicon (M1/M2/M3/M4). The CUDA backend has been replaced by Metal.
+> This fork keeps the upstream CUDA backend available and adds an Apple Silicon
+> Metal backend for macOS builds.
 >
-> For Linux / CUDA support, and information, refer to the **original project**:
+> Backend selection is handled at CMake configure time:
+> `CUDA` is used when enabled and available, otherwise Apple builds can fall
+> back to `Metal`.
+>
+> Upstream project information:
 > [https://gnina.github.io/libmolgrid/](https://gnina.github.io/libmolgrid/)
 
 If you use libmolgrid in your research, please cite:
@@ -25,7 +28,7 @@ If you use libmolgrid in your research, please cite:
 }
 ```
 
-## Installation (macOS / Apple Silicon)
+## Installation
 
 ### Prerequisites
 
@@ -36,7 +39,7 @@ brew install cmake boost open-babel rapidjson eigen python
 pip3 install numpy pytest pyquaternion
 ```
 
-Xcode Command Line Tools are required for the Metal shader compiler (`metal`, `metallib`):
+Xcode Command Line Tools are required when building the Metal backend (`metal`, `metallib`):
 
 ```bash
 xcode-select --install
@@ -53,8 +56,18 @@ make -j$(sysctl -n hw.logicalcpu)
 sudo make install
 ```
 
-The Metal shaders (`src/metal/shaders.metal`) are compiled automatically into a
-`.metallib` during the build. No CUDA installation is required.
+Useful backend switches:
+
+```bash
+# Force the upstream CUDA backend
+cmake .. -DCMAKE_BUILD_TYPE=Release -DLIBMOLGRID_ENABLE_METAL=OFF
+
+# Force the Apple Metal backend
+cmake .. -DCMAKE_BUILD_TYPE=Release -DLIBMOLGRID_ENABLE_CUDA=OFF
+```
+
+When the Metal backend is selected, the shaders in `src/metal/shaders.metal`
+are compiled automatically into a `.metallib`.
 
 On Apple Silicon, GPU and CPU share unified memory — no explicit host↔device
 copies occur at runtime.
@@ -66,10 +79,16 @@ Tests must be run from the `build/bin/` directory so that relative data paths re
 ```bash
 cd build/bin
 ./test_gridmaker_cpp
-./test_gridmaker_mps_mm
-./test_grid_mps_mm
-./test_mgrid_mps_mm
-./test_transform_mps_mm
+./test_gridmaker_mps_mm   # Metal backend
+./test_grid_mps_mm        # Metal backend
+./test_mgrid_mps_mm       # Metal backend
+./test_transform_mps_mm   # Metal backend
+
+# or, on CUDA builds
+./test_gridmaker_cu
+./test_grid_cu
+./test_mgrid_cu
+./test_transform_cu
 ```
 
 ## Example

@@ -404,9 +404,13 @@ BOOST_PYTHON_MODULE(molgrid)
       "Set if generated grids should be on GPU by default.");
   def("tofloatptr", +[](long val) { return Pointer<float>((float*)val);}, "Return integer as float *");
   def("todoubleptr", +[](long val) { return Pointer<double>((double*)val);}, "Return integer as double *");
-  // Apple Silicon: single unified GPU, device is always 0.
-  def("set_gpu_device", +[](int device)->void { (void)device; }, "Set current GPU device (no-op on Apple Silicon).");
-  def("get_gpu_device", +[]()->int { return 0; }, "Get current GPU device (always 0 on Apple Silicon).");
+#if LIBMOLGRID_USE_CUDA
+  def("set_gpu_device", +[](int device)->void {LMG_CUDA_CHECK(cudaSetDevice(device));}, "Set current GPU device.");
+  def("get_gpu_device", +[]()->int {int device = 0; LMG_CUDA_CHECK(cudaGetDevice(&device)); return device;}, "Get current GPU device.");
+#else
+  def("set_gpu_device", +[](int device)->void { (void)device; }, "Set current GPU device (no-op on Metal builds).");
+  def("get_gpu_device", +[]()->int { return 0; }, "Get current GPU device (always 0 on Metal builds).");
+#endif
 
   //type converters
   py_pair<int, float>();

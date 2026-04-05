@@ -6,20 +6,32 @@ include_directories (${Boost_INCLUDE_DIRS})
 find_package(OpenBabel3 REQUIRED)
 include_directories(SYSTEM ${OPENBABEL3_INCLUDE_DIR})
 
-#get all cpp/mm files
+#get all test files
 set( TEST_SRCS
  test_coordinateset.cpp
  test_grid.cpp
- test_grid_mps.mm
  test_gridmaker.cpp
- test_gridmaker_mps.mm
  test_gridinterp.cpp
  test_mgrid.cpp
- test_mgrid_mps.mm
  test_quaternion.cpp
  test_transform.cpp
- test_transform_mps.mm
 )
+
+if(LIBMOLGRID_USE_CUDA)
+  list(APPEND TEST_SRCS
+    test_grid.cu
+    test_gridmaker.cu
+    test_mgrid.cu
+    test_transform.cu
+  )
+else()
+  list(APPEND TEST_SRCS
+    test_grid_mps.mm
+    test_gridmaker_mps.mm
+    test_mgrid_mps.mm
+    test_transform_mps.mm
+  )
+endif()
 
 #Run through each source
 foreach(testSrc ${TEST_SRCS})
@@ -34,10 +46,10 @@ foreach(testSrc ${TEST_SRCS})
         #link to Boost libraries AND your targets and dependencies
         if(BUILD_STATIC)
            target_link_libraries(${testName} libmolgrid_static ${Boost_LIBRARIES}
-               "-framework Metal" "-framework Foundation")
+               ${CUDA_LIBRARIES} ${METAL_FRAMEWORK} ${FOUNDATION_FRAMEWORK})
         else()
            target_link_libraries(${testName} libmolgrid_shared ${Boost_LIBRARIES}
-               "-framework Metal" "-framework Foundation")
+               ${CUDA_LIBRARIES} ${METAL_FRAMEWORK} ${FOUNDATION_FRAMEWORK})
         endif()
 
         #Finally add it to test execution -

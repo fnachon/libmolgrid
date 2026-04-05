@@ -12,6 +12,7 @@
 
 namespace libmolgrid {
 
+#if !LIBMOLGRID_USE_CUDA
 // Helper used by calc_point specializations
 static inline float sqDistance(float3 pt, float x, float y, float z) {
   float ret;
@@ -45,6 +46,7 @@ float GridMaker::calc_point<true>(float ax, float ay, float az, float ar,
   ar *= radius_scale;
   return (rsq < ar * ar) ? 1.0f : 0.0f;
 }
+#endif
 
 
 void GridMaker::initialize(float res, float d, bool bin, float rscale, float grm) {
@@ -745,6 +747,7 @@ template void GridMaker::backward_relevance(float3,  const Grid<float, 2, false>
     const Grid<float, 1, false>&, const Grid<float, 1, false>&, const Grid<double, 4, false>&,
     const Grid<double, 4, false>& , Grid<double, 1, false>& ) const;
 
+#if !LIBMOLGRID_USE_CUDA
 // ---------------------------------------------------------------------------
 // Definitions previously in grid_maker.cu (non-kernel, CPU-callable functions)
 // ---------------------------------------------------------------------------
@@ -826,5 +829,6 @@ void GridMaker::accumulate_atom_gradient(float ax, float ay, float az,
     agrad.z += -(dist_z / dist) * (agrad_dist * gridval);
   }
 }
+#endif
 
 }

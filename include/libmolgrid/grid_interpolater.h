@@ -1,8 +1,7 @@
 /*
  * grid_interpolater.h
  *
- * Ported from CUDA to Apple Silicon MPS (unified memory).
- * Texture-memory path removed (it was already disabled in the original).
+ * Grid interpolation helpers.
  */
 
 #ifndef INCLUDE_LIBMOLGRID_GRID_INTERPOLATER_H_
@@ -40,6 +39,12 @@ class GridInterpolater {
     template <typename Dtype, bool isCUDA>
     void checkGrids(const Grid<Dtype, 4, isCUDA>& in, const Grid<Dtype, 4, isCUDA>& out) const;
 
+#if LIBMOLGRID_USE_CUDA
+    cudaTextureObject_t initializeTexture(const Grid<float, 3, true>& in) const;
+    void clearTexture();
+    mutable cudaArray_t cuArray = nullptr;
+#endif
+
   public:
 
     /** \brief Construct GridInterpolater
@@ -55,7 +60,11 @@ class GridInterpolater {
         out_dim = std::round(out_dimension / out_resolution) + 1;
     }
 
-    virtual ~GridInterpolater() {}
+    virtual ~GridInterpolater() {
+#if LIBMOLGRID_USE_CUDA
+      clearTexture();
+#endif
+    }
 
     ///return resolution of input grid in Angstroms
     CUDA_CALLABLE_MEMBER float get_in_resolution()  const { return in_resolution; }
@@ -66,6 +75,9 @@ class GridInterpolater {
     CUDA_CALLABLE_MEMBER void set_in_resolution(float res) {
       in_dim = std::round(in_dimension / in_resolution) + 1;
       in_resolution = res;
+#if LIBMOLGRID_USE_CUDA
+      clearTexture();
+#endif
     }
     ///set output resolution in Angstroms
     CUDA_CALLABLE_MEMBER void set_out_resolution(float res) { out_resolution = res; }
@@ -79,6 +91,9 @@ class GridInterpolater {
     CUDA_CALLABLE_MEMBER void set_in_dimension(float d) {
       in_dim = std::round(in_dimension / in_resolution) + 1;
       in_dimension = d;
+#if LIBMOLGRID_USE_CUDA
+      clearTexture();
+#endif
     }
     ///set output dimension in Angstroms
     CUDA_CALLABLE_MEMBER void set_out_dimension(float d) { out_dimension = d; }

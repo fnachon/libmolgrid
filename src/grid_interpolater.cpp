@@ -79,6 +79,7 @@ namespace libmolgrid {
   template void GridInterpolater::checkGrids(const Grid<double, 4, false>& in, const Grid<double, 4, false>& out) const;
   template void GridInterpolater::checkGrids(const Grid<float, 4, true>& in, const Grid<float, 4, true>& out) const;
 
+#if !LIBMOLGRID_USE_CUDA
   // ---------------------------------------------------------------------------
   // Definitions previously in grid_interpolater.cu (CPU-callable)
   // ---------------------------------------------------------------------------
@@ -117,5 +118,6 @@ namespace libmolgrid {
   template float  GridInterpolater::interpolate(const Grid<float,  3, true>&  in, float3 pt) const;
   template float  GridInterpolater::interpolate(const Grid<float,  3, false>& in, float3 pt) const;
   template double GridInterpolater::interpolate(const Grid<double, 3, false>& in, float3 pt) const;
+#endif
 
 }

@@ -286,7 +286,14 @@ class GridMaker {
       float3 center = { 0, };
 
       for(unsigned i = 0; i < B; i++) {
+#if LIBMOLGRID_USE_CUDA
+        if constexpr (isCUDA)
+          LMG_CUDA_CHECK(cudaMemcpy(&center, centers[i].data(), sizeof(center), cudaMemcpyDeviceToHost));
+        else
+          memcpy(&center, centers[i].data(), sizeof(center));
+#else
         memcpy(&center, centers[i].data(), sizeof(center));
+#endif
 
         //convert from subgrids to full grids
         Grid<float, 2, isCUDA> C = coords[i];
@@ -695,8 +702,23 @@ class GridMaker {
     CUDA_CALLABLE_MEMBER void accumulate_atom_gradient(float ax, float ay, float az,
             float x, float y, float z, float radius, float gridval, float3& agrad) const;
 
-    // Metal GPU kernels are free functions dispatched through MetalContext;
-    // no friend declarations needed (they access GridMaker via passed params).
+#if LIBMOLGRID_USE_CUDA
+    template<typename Dtype> __global__ friend
+    void set_atom_gradients(GridMaker G, float3 grid_center, Grid2fCUDA coords, Grid1fCUDA type_index,
+        Grid1fCUDA radii, Grid<Dtype, 4, true> grid, Grid<Dtype, 2, true> atom_gradients);
+    template<typename Dtype, bool RadiiFromTypes> __global__ friend
+    void set_atom_type_gradients(GridMaker G, float3 grid_origin, Grid2fCUDA coords, Grid2fCUDA type_vector,
+        unsigned ntypes, Grid1fCUDA radii, Grid<Dtype, 4, true> grid, Grid<Dtype, 2, true> atom_gradients,
+        Grid<Dtype, 2, true> type_gradients);
+    template<typename Dtype, bool RadiiFromTypes> __global__ friend
+    void set_atom_type_grad_grad(GridMaker G, float3 grid_origin, Grid2fCUDA coords, Grid2fCUDA type_vector,
+        unsigned ntypes, Grid1fCUDA radii, Grid<Dtype, 4, true> diff, Grid<Dtype, 2, true> atom_gradients,
+        Grid<Dtype, 2, true> type_gradients, Grid<Dtype, 4, true> diffdiff, Grid<Dtype, 2, true> atom_diffdiff,
+        Grid<Dtype, 2, true> type_diffdiff);
+    template<typename Dtype> __global__ friend
+    void set_atom_relevance(GridMaker G, float3 grid_origin, Grid2fCUDA coords, Grid1fCUDA type_index,
+        Grid1fCUDA radii, Grid<Dtype, 4, true> densitygrid, Grid<Dtype, 4, true> diffgrid, Grid<Dtype, 1, true> relevance);
+#endif
 };
 
 } /* namespace libmolgrid */

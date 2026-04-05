@@ -22,6 +22,22 @@ namespace libmolgrid {
 
 template<typename Dt, std::size_t ND> class ManagedGrid; //predeclare
 
+#if LIBMOLGRID_USE_CUDA
+inline cudaMemcpyKind copyKind(bool srcCUDA, bool destCUDA) {
+  if (srcCUDA) {
+    if (destCUDA)
+      return cudaMemcpyDeviceToDevice;
+    else
+      return cudaMemcpyDeviceToHost;
+  } else {
+    if (destCUDA)
+      return cudaMemcpyHostToDevice;
+    else
+      return cudaMemcpyHostToHost;
+  }
+}
+#endif
+
 /**
  * \class Grid
  * A dense array of memory. The memory is owned and managed external to this
@@ -49,9 +65,13 @@ class Grid {
     }
 
     CUDA_CALLABLE_MEMBER void check_index(size_t i, size_t dim) const {
+#if LIBMOLGRID_USE_CUDA && defined(__CUDA_ARCH__)
+      assert(i < dim);
+#else
       if(i >= dim) {
         throw std::out_of_range("Invalid range. "+itoa(i) + " >= " + itoa(dim));
       }
+#endif
     }
 
   public:
@@ -164,14 +184,22 @@ class Grid {
 
     /** \brief copy contents to dest
      *
-     *  On Apple Silicon all memory is unified; memcpy is sufficient for
-     *  both host-to-host and host-to-device copies.
+     *  Sizes should be the same, but will narrow as necessary.  Will copy across device/host.
      */
     template<bool destCUDA>
     size_t copyTo(Grid<Dtype,NumDims,destCUDA>& dest) const {
       size_t sz = std::min(size(), dest.size());
       if(sz == 0) return 0;
+#if LIBMOLGRID_USE_CUDA
+      if constexpr (isCUDA || destCUDA) {
+        cudaMemcpyKind kind = copyKind(isCUDA, destCUDA);
+        LMG_CUDA_CHECK(cudaMemcpy(dest.data(), data(), sz * sizeof(Dtype), kind));
+      } else {
+        memcpy(dest.data(), data(), sz * sizeof(Dtype));
+      }
+#else
       memcpy(dest.data(), data(), sz * sizeof(Dtype));
+#endif
       return sz;
     }
 
@@ -180,13 +208,30 @@ class Grid {
     size_t copyFrom(const Grid<Dtype,NumDims,srcCUDA>& src) {
       size_t sz = std::min(size(), src.size());
       if(sz == 0) return 0;
+#if LIBMOLGRID_USE_CUDA
+      if constexpr (srcCUDA || isCUDA) {
+        cudaMemcpyKind kind = copyKind(srcCUDA, isCUDA);
+        LMG_CUDA_CHECK(cudaMemcpy(data(), src.data(), sz * sizeof(Dtype), kind));
+      } else {
+        memcpy(data(), src.data(), sz * sizeof(Dtype));
+      }
+#else
       memcpy(data(), src.data(), sz * sizeof(Dtype));
+#endif
       return sz;
     }
 
     /** \brief Set contents to zero. */
     void fill_zero() {
+#if LIBMOLGRID_USE_CUDA
+      if constexpr (isCUDA) {
+        LMG_CUDA_CHECK(cudaMemset(data(), 0, sizeof(Dtype) * size()));
+      } else {
+        memset(data(), 0, sizeof(Dtype) * size());
+      }
+#else
       memset(data(), 0, sizeof(Dtype) * size());
+#endif
     }
 
     // constructor used by operator[], create a subgrid, assuming memory is allocated
@@ -209,9 +254,13 @@ class Grid<Dtype,1,isCUDA> {
     size_t dims[1]; /// length of array
 
     CUDA_CALLABLE_MEMBER void check_index(size_t i, size_t dim) const {
+#if LIBMOLGRID_USE_CUDA && defined(__CUDA_ARCH__)
+      assert(i < dim);
+#else
       if(i >= dim) {
         throw std::out_of_range("Invalid range. "+ itoa(i) + " >= " + itoa(dim));
       }
+#endif
     }
   public:
     using type = Dtype;
@@ -263,7 +312,15 @@ class Grid<Dtype,1,isCUDA> {
     }
 
     void fill_zero() {
+#if LIBMOLGRID_USE_CUDA
+      if constexpr (isCUDA) {
+        LMG_CUDA_CHECK(cudaMemset(data(), 0, sizeof(Dtype) * size()));
+      } else {
+        memset(data(), 0, sizeof(Dtype) * size());
+      }
+#else
       memset(data(), 0, sizeof(Dtype) * size());
+#endif
     }
 
     //only called from regular Grid
@@ -276,7 +333,16 @@ class Grid<Dtype,1,isCUDA> {
     size_t copyTo(Grid<Dtype,1,destCUDA>& dest) const {
       size_t sz = std::min(size(), dest.size());
       if(sz == 0) return sz;
+#if LIBMOLGRID_USE_CUDA
+      if constexpr (isCUDA || destCUDA) {
+        cudaMemcpyKind kind = copyKind(isCUDA, destCUDA);
+        LMG_CUDA_CHECK(cudaMemcpy(dest.data(), data(), sz * sizeof(Dtype), kind));
+      } else {
+        memcpy(dest.data(), data(), sz * sizeof(Dtype));
+      }
+#else
       memcpy(dest.data(), data(), sz * sizeof(Dtype));
+#endif
       return sz;
     }
 
@@ -284,7 +350,16 @@ class Grid<Dtype,1,isCUDA> {
     size_t copyFrom(const Grid<Dtype,1,srcCUDA>& src) {
       size_t sz = std::min(size(), src.size());
       if(sz == 0) return sz;
+#if LIBMOLGRID_USE_CUDA
+      if constexpr (srcCUDA || isCUDA) {
+        cudaMemcpyKind kind = copyKind(srcCUDA, isCUDA);
+        LMG_CUDA_CHECK(cudaMemcpy(data(), src.data(), sz * sizeof(Dtype), kind));
+      } else {
+        memcpy(data(), src.data(), sz * sizeof(Dtype));
+      }
+#else
       memcpy(data(), src.data(), sz * sizeof(Dtype));
+#endif
       return sz;
     }
 

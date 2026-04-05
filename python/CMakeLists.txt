@@ -55,13 +55,13 @@ if(BUILD_CONTAINED_PYTHON)
   add_link_options("LINKER:--exclude-libs,ALL")  # avoid exporting stdc++ symbols
   add_library(molgrid SHARED ${PYMOLGRID_SOURCES})
   target_link_libraries(molgrid ${Boost_LIBRARIES} ${PYTHON_LIBRARY}
-      libmolgrid_static "-framework Metal" "-framework Foundation"
+      ${CUDA_LIBRARIES} ${METAL_FRAMEWORK} ${FOUNDATION_FRAMEWORK} libmolgrid_static
       -static-libstdc++ -static-libgcc)
 else()
 # create the lib
   add_library(molgrid SHARED ${PYMOLGRID_SOURCES})
   target_link_libraries(molgrid ${Boost_LIBRARIES} ${PYTHON_LIBRARY}
-      libmolgrid_shared "-framework Metal" "-framework Foundation")
+      ${CUDA_LIBRARIES} ${METAL_FRAMEWORK} ${FOUNDATION_FRAMEWORK} libmolgrid_shared)
 endif()
 
 # Suppress prefix "lib" because Python does not allow this prefix
