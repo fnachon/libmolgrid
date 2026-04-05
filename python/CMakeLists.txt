@@ -19,6 +19,14 @@ endif()
 
 find_package( NumPy )
 
+execute_process(
+  COMMAND ${PYTHON_EXECUTABLE} -c "import sysconfig; print(sysconfig.get_config_var('EXT_SUFFIX') or '.so', end='')"
+  OUTPUT_VARIABLE PYTHON_MODULE_EXTENSION
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(NOT PYTHON_MODULE_EXTENSION)
+  set(PYTHON_MODULE_EXTENSION ".so")
+endif()
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/src)
 include_directories(${PYTHON_INCLUDE_DIRS})
@@ -67,6 +75,7 @@ endif()
 # Suppress prefix "lib" because Python does not allow this prefix
 set_target_properties(molgrid PROPERTIES 
 									PREFIX ""
+									SUFFIX "${PYTHON_MODULE_EXTENSION}"
 									LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/molgrid/")
 									
                   

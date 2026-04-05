@@ -30,8 +30,46 @@ If you use libmolgrid in your research, please cite:
 
 ## Installation
 
-### Prerequisites
+### PIP
 
+```bash
+pip install molgrid
+```
+
+### conda
+
+```bash
+conda install -c gnina molgrid
+```
+
+### Build from Source
+
+```bash
+apt install git build-essential libboost-all-dev python3-pip rapidjson-dev
+pip3 install numpy pytest pyquaternion
+```
+
+[Install cmake 3.12 or higher.](https://cmake.org/install/)
+
+[Install CUDA.](https://developer.nvidia.com/cuda-downloads)
+
+[Install OpenBabel 3.0.](https://github.com/openbabel/openbabel)
+
+`apt install libeigen3-dev libboost-all-dev`
+
+```bash
+git clone https://github.com/gnina/libmolgrid.git
+cd libmolgrid
+mkdir build
+cd build
+cmake ..
+make -j8
+sudo make install
+```
+
+### macOS / Apple Silicon
+
+For this fork, macOS builds can use the Metal backend when CUDA is not available.
 Install dependencies via [Homebrew](https://brew.sh):
 
 ```bash
@@ -39,31 +77,28 @@ brew install cmake boost open-babel rapidjson eigen python
 pip3 install numpy pytest pyquaternion
 ```
 
-Xcode Command Line Tools are required when building the Metal backend (`metal`, `metallib`):
+Xcode Command Line Tools are required for the Metal toolchain:
 
 ```bash
 xcode-select --install
 ```
 
-### Build from Source
+Build with Metal explicitly enabled:
 
 ```bash
-git clone https://github.com/gnina/libmolgrid.git
+git clone https://github.com/fnachon/libmolgrid.git
 cd libmolgrid
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DLIBMOLGRID_ENABLE_CUDA=OFF
 make -j$(sysctl -n hw.logicalcpu)
 sudo make install
 ```
 
-Useful backend switches:
+To build with the upstream CUDA backend instead, disable Metal and use a CUDA-enabled toolchain:
 
 ```bash
-# Force the upstream CUDA backend
 cmake .. -DCMAKE_BUILD_TYPE=Release -DLIBMOLGRID_ENABLE_METAL=OFF
-
-# Force the Apple Metal backend
-cmake .. -DCMAKE_BUILD_TYPE=Release -DLIBMOLGRID_ENABLE_CUDA=OFF
 ```
 
 When the Metal backend is selected, the shaders in `src/metal/shaders.metal`
