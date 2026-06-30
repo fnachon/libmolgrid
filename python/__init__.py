@@ -2,6 +2,10 @@ from .molgrid import *
 import sys, inspect
 import numpy as np
 
+# Vec3 used to be named float3 (it borrowed CUDA's vector_types.h name even
+# in non-CUDA builds); keep the old name available for existing user code.
+float3 = Vec3
+
 if sys.version_info >= (3, 8):
     from importlib import metadata
 else:
