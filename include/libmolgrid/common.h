@@ -28,24 +28,20 @@
 #define CUDA_DEVICE_MEMBER
 #endif
 
-#if !LIBMOLGRID_USE_CUDA
-struct float2 { float x, y; };
-struct float3 { float x, y, z; };
-struct float4 { float x, y, z, w; };
-struct int2 { int x, y; };
-struct int3 { int x, y, z; };
-struct uint2 { unsigned int x, y; };
-struct uint3 { unsigned int x, y, z; };
-struct double3 { double x, y, z; };
+// Backend-neutral vector types for the public/host API. These are plain PODs
+// (not CUDA's own vector_types.h float3 etc.) so the API doesn't masquerade
+// as CUDA-specific when built without CUDA. They're also valid __host__
+// __device__ types under nvcc, so CUDA_CALLABLE_MEMBER functions can use them.
+struct Vec3 { float x, y, z; };
+struct UVec2 { unsigned int x, y; };
 
-inline float2 make_float2(float x, float y) { return {x, y}; }
-inline float3 make_float3(float x, float y, float z) { return {x, y, z}; }
-inline float4 make_float4(float x, float y, float z, float w) { return {x, y, z, w}; }
-inline int2 make_int2(int x, int y) { return {x, y}; }
-inline int3 make_int3(int x, int y, int z) { return {x, y, z}; }
-inline uint2 make_uint2(unsigned x, unsigned y) { return {x, y}; }
-inline uint3 make_uint3(unsigned x, unsigned y, unsigned z) { return {x, y, z}; }
-inline double3 make_double3(double x, double y, double z) { return {x, y, z}; }
+inline Vec3 make_vec3(float x, float y, float z) { return {x, y, z}; }
+inline UVec2 make_uvec2(unsigned x, unsigned y) { return {x, y}; }
+
+#if LIBMOLGRID_USE_CUDA
+// Conversion at the host/device kernel-launch boundary: CUDA kernels still
+// take native ::float3 (the real, hardware-recognized CUDA vector type).
+inline ::float3 to_cuda(Vec3 v) { return make_float3(v.x, v.y, v.z); }
 #endif
 
 #if LIBMOLGRID_USE_CUDA
