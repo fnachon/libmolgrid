@@ -26,7 +26,7 @@ BOOST_AUTO_TEST_CASE(forward_agreement) {
   float dimension = 23.5;
   float radiusmultiple = 1.5;
   GridMaker gmaker(resolution, dimension, radiusmultiple);
-  float3 dim = gmaker.get_grid_dims();
+  Vec3 dim = gmaker.get_grid_dims();
 
   // Randomly generated example: check equivalence between GPU (Metal) and CPU.
   random_engine.seed(0);
@@ -36,7 +36,7 @@ BOOST_AUTO_TEST_CASE(forward_agreement) {
   size_t ntypes = (unsigned)GninaIndexTyper::NumTypes;
   MGrid4f cout(ntypes, dim.x, dim.y, dim.z);
   make_mol(coords.cpu(), type_indices.cpu(), radii.cpu(), natoms);
-  float3 grid_center = make_float3(0, 0, 0);
+  Vec3 grid_center = make_vec3(0, 0, 0);
 
   // CPU forward pass
   gmaker.forward(grid_center, coords.cpu(), type_indices.cpu(), radii.cpu(), cout.cpu());

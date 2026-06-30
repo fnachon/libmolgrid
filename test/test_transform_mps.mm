@@ -19,10 +19,10 @@ BOOST_AUTO_TEST_CASE(apply_transform)
 {
   // Non-random transform
   Quaternion q(sqrt(0.5f), 0, 0, sqrt(0.5f)); // 90-degree rotation around Z
-  Transform nr(q, make_float3(0,1,1), make_float3(2,0,-3));
+  Transform nr(q, make_vec3(0,1,1), make_vec3(2,0,-3));
 
   // Random transform
-  Transform r(make_float3(0,1,1), 10.0f, true);
+  Transform r(make_vec3(0,1,1), 10.0f, true);
 
   float coord_data[8][3] = {
     {0,0,0}, {1,0,0}, {0,1,0}, {0,0,1},
@@ -40,17 +40,17 @@ BOOST_AUTO_TEST_CASE(apply_transform)
   // Apply non-random transform on GPU (Metal)
   nr.forward(coords.gpu(), coords2.gpu());
 
-  float3 expected = make_float3(2,1,-2);
+  Vec3 expected = make_vec3(2,1,-2);
   eqPt(coords2[6], expected); // at center
 
-  expected = make_float3(2,1,-3);
+  expected = make_vec3(2,1,-3);
   eqPt(coords2[2], expected); // on z-axis
 
-  expected = make_float3(2,2,-2);
+  expected = make_vec3(2,2,-2);
   eqPt(coords2[5], expected);
 
   // Input should be unchanged
-  expected = make_float3(0.333f, .75f, -9);
+  expected = make_vec3(0.333f, .75f, -9);
   eqPt(coords[7], expected);
 
   // Random transform – GPU output should differ from input
