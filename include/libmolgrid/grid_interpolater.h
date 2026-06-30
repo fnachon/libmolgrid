@@ -103,7 +103,7 @@ class GridInterpolater {
     /* \brief Interpolate a grid tensor from another grid (CPU). */
     template <typename Dtype>
     void forward(const Grid<Dtype, 4, false>& in, const Transform& transform, Grid<Dtype, 4, false>& out) const {
-      float3 center = transform.get_rotation_center();
+      Vec3 center = transform.get_rotation_center();
       forward(center, in, transform, center, out);
     }
 
@@ -111,31 +111,31 @@ class GridInterpolater {
     /* \brief Interpolate a grid tensor from another grid (GPU/unified memory). */
     template <typename Dtype>
     void forward(const Grid<Dtype, 4, true>& in, const Transform& transform, Grid<Dtype, 4, true>& out) const {
-      float3 center = transform.get_rotation_center();
+      Vec3 center = transform.get_rotation_center();
       forward(center, in, transform, center, out);
     }
 
     // Docstring_GridInterpolater_forward_3
     template <typename Dtype>
     void forward(const Grid<Dtype, 4, false>& in, Grid<Dtype, 4, false>& out, float random_translation=0, bool random_rotation=false) const {
-        Transform t(make_float3(0.0, 0.0, 0.0), random_translation, random_rotation);
+        Transform t(make_vec3(0.0, 0.0, 0.0), random_translation, random_rotation);
         forward(in, t, out);
     }
 
     // Docstring_GridInterpolater_forward_4
     template <typename Dtype>
     void forward(const Grid<Dtype, 4, true>& in, Grid<Dtype, 4, true>& out, float random_translation=0, bool random_rotation=false) const {
-        Transform t(make_float3(0.0, 0.0, 0.0), random_translation, random_rotation);
+        Transform t(make_vec3(0.0, 0.0, 0.0), random_translation, random_rotation);
         forward(in, t, out);
     }
 
     // Docstring_GridInterpolater_forward_5
     template <typename Dtype>
-    void forward(float3 in_center, const Grid<Dtype, 4, false>& in, const Transform& transform, float3 out_center, Grid<Dtype, 4, false>& out) const;
+    void forward(Vec3 in_center, const Grid<Dtype, 4, false>& in, const Transform& transform, Vec3 out_center, Grid<Dtype, 4, false>& out) const;
 
     // Docstring_GridInterpolater_forward_6
     template <typename Dtype>
-    void forward(float3 in_center, const Grid<Dtype, 4, true>& in, const Transform& transform, float3 out_center, Grid<Dtype, 4, true>& out) const;
+    void forward(Vec3 in_center, const Grid<Dtype, 4, true>& in, const Transform& transform, Vec3 out_center, Grid<Dtype, 4, true>& out) const;
 
     //TODO: backwards
 
@@ -143,18 +143,18 @@ class GridInterpolater {
     CUDA_CALLABLE_MEMBER Dtype get_pt(const Grid<Dtype, 3, isCUDA>& in, int x, int y, int z) const;
 
     template <typename Dtype, bool isCUDA>
-    CUDA_CALLABLE_MEMBER Dtype interpolate(const Grid<Dtype, 3, isCUDA>& in, float3 gridpt) const;
+    CUDA_CALLABLE_MEMBER Dtype interpolate(const Grid<Dtype, 3, isCUDA>& in, Vec3 gridpt) const;
 };
 
 // return grid coordinates (not rounded) for Cartesian coordinates
-inline CUDA_CALLABLE_MEMBER float3 cart2grid(float3 origin, float resolution, float x, float y, float z) {
-    float3 pt = { (x-origin.x)/resolution, (y-origin.y)/resolution, (z-origin.z)/resolution };
+inline CUDA_CALLABLE_MEMBER Vec3 cart2grid(Vec3 origin, float resolution, float x, float y, float z) {
+    Vec3 pt = { (x-origin.x)/resolution, (y-origin.y)/resolution, (z-origin.z)/resolution };
     return pt;
 }
 
 // return Cartesian coordinates of provided grid position
-inline CUDA_CALLABLE_MEMBER float3 grid2cart(float3 origin, float resolution, unsigned i, unsigned j, unsigned k) {
-    float3 pt = {origin.x+i*resolution, origin.y+j*resolution, origin.z+k*resolution};
+inline CUDA_CALLABLE_MEMBER Vec3 grid2cart(Vec3 origin, float resolution, unsigned i, unsigned j, unsigned k) {
+    Vec3 pt = {origin.x+i*resolution, origin.y+j*resolution, origin.z+k*resolution};
     return pt;
 }
 

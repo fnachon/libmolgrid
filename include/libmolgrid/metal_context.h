@@ -57,13 +57,13 @@ public:
 
     void transform_forward(unsigned n,
                            const QuatParams& Q,
-                           float3 center, float3 translate,
+                           Vec3 center, Vec3 translate,
                            const float* in, float* out,
                            bool dotranslate);
 
     void transform_backward(unsigned n,
                             const QuatParams& invQ,
-                            float3 center, float3 translate,
+                            Vec3 center, Vec3 translate,
                             const float* in, float* out,
                             bool dotranslate);
 
@@ -79,7 +79,7 @@ public:
 
     // Index-typed atoms (binary or gaussian)
     void forward_index(const GridMakerParams& gm,
-                       float3 grid_origin,
+                       Vec3 grid_origin,
                        const float* coords, unsigned natoms,
                        const float* type_index,
                        const float* radii,
@@ -89,7 +89,7 @@ public:
 
     // Vector-typed atoms (binary or gaussian, optionally type-indexed radii)
     void forward_vec(const GridMakerParams& gm,
-                     float3 grid_origin,
+                     Vec3 grid_origin,
                      const float* coords, unsigned natoms,
                      const float* type_vector, unsigned ntypes,
                      const float* radii, float maxradius,
@@ -99,7 +99,7 @@ public:
     // ---- GridMaker backward kernels -----------------------------------------
 
     void backward_index(const GridMakerParams& gm,
-                        float3 grid_origin,
+                        Vec3 grid_origin,
                         const float* coords,
                         const float* type_index,
                         const float* radii,
@@ -108,7 +108,7 @@ public:
                         unsigned natoms, unsigned ntypes, unsigned dim);
 
     void backward_vec(const GridMakerParams& gm,
-                      float3 grid_origin,
+                      Vec3 grid_origin,
                       const float* coords,
                       const float* type_vector, unsigned ntypes,
                       const float* radii,
@@ -119,7 +119,7 @@ public:
                       bool radii_type_indexed);
 
     void backward_gradients(const GridMakerParams& gm,
-                            float3 grid_origin,
+                            Vec3 grid_origin,
                             const float* coords,
                             const float* type_vector, unsigned ntypes,
                             const float* radii,
@@ -133,7 +133,7 @@ public:
                             bool radii_type_indexed);
 
     void backward_relevance(const GridMakerParams& gm,
-                            float3 grid_origin,
+                            Vec3 grid_origin,
                             const float* coords,
                             const float* type_index,
                             const float* radii,
@@ -145,11 +145,11 @@ public:
     // ---- GridInterpolater kernel --------------------------------------------
 
     void grid_interpolate(const float* in,  unsigned in_dim,
-                          float3 in_origin,  float in_res,
+                          Vec3 in_origin,  float in_res,
                           const QuatParams& invQ,
-                          float3 untranslate, float3 center,
+                          Vec3 untranslate, Vec3 center,
                           float* out, unsigned out_dim,
-                          float3 out_origin, float out_res);
+                          Vec3 out_origin, float out_res);
 
     // ---- Utility ------------------------------------------------------------
 

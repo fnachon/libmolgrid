@@ -39,7 +39,7 @@ size_t Example::num_types(bool unique_index_types) const {
 //grid version
 void Example::merge_coordinates(Grid2f& c, Grid1f& t, Grid1f& r, unsigned start, bool unique_index_types) const {
 
-  vector<float3> coords;
+  vector<Vec3> coords;
   vector<float> types;
   vector<float> radii;
 
@@ -60,13 +60,13 @@ void Example::merge_coordinates(Grid2f& c, Grid1f& t, Grid1f& r, unsigned start,
   }
 
   //copy data
-  memcpy(c.data(), &coords[0], sizeof(float3)*coords.size());
+  memcpy(c.data(), &coords[0], sizeof(Vec3)*coords.size());
   memcpy(t.data(), &types[0], sizeof(float)*types.size());
   memcpy(r.data(), &radii[0], sizeof(float)*radii.size());
 
 }
 
-void Example::merge_coordinates(std::vector<float3>& coords, std::vector<float>& types, std::vector<float>& radii, unsigned start, bool unique_index_types) const {
+void Example::merge_coordinates(std::vector<Vec3>& coords, std::vector<float>& types, std::vector<float>& radii, unsigned start, bool unique_index_types) const {
   unsigned N = num_coordinates();
 
   coords.clear();
@@ -91,7 +91,7 @@ void Example::merge_coordinates(std::vector<float3>& coords, std::vector<float>&
     //todo: memcpy this
     for(unsigned i = 0; i < n; i++) {
       auto cr = CS.coords[i];
-      coords.push_back(make_float3(cr[0],cr[1],cr[2]));
+      coords.push_back(make_vec3(cr[0],cr[1],cr[2]));
       types.push_back(CS.type_index[i]+toffset);
       radii.push_back(CS.radii[i]);
     }
@@ -102,7 +102,7 @@ void Example::merge_coordinates(std::vector<float3>& coords, std::vector<float>&
 //grid version of vector
 void Example::merge_coordinates(Grid2f& c, Grid2f& t, Grid1f& r, unsigned start, bool unique_index_types) const {
 
-  vector<float3> coords;
+  vector<Vec3> coords;
   vector< vector<float> > types;
   vector<float> radii;
 
@@ -129,13 +129,13 @@ void Example::merge_coordinates(Grid2f& c, Grid2f& t, Grid1f& r, unsigned start,
   }
 
   //copy data
-  memcpy(c.data(), &coords[0], sizeof(float3)*coords.size());
+  memcpy(c.data(), &coords[0], sizeof(Vec3)*coords.size());
   memcpy(t.data(), &types[0], sizeof(float)*types.size());
   memcpy(r.data(), &radii[0], sizeof(float)*radii.size());
 
 }
 
-void Example::merge_coordinates(std::vector<float3>& coords, std::vector<std::vector<float> >& types,
+void Example::merge_coordinates(std::vector<Vec3>& coords, std::vector<std::vector<float> >& types,
     std::vector<float>& radii, unsigned start, bool unique_index_types) const {
 
   coords.clear();
@@ -177,7 +177,7 @@ void Example::merge_coordinates(std::vector<float3>& coords, std::vector<std::ve
     //todo: memcpy this
     for(unsigned i = 0; i < n; i++) {
       auto cr = CS.coords[i];
-      coords.push_back(make_float3(cr[0],cr[1],cr[2]));
+      coords.push_back(make_vec3(cr[0],cr[1],cr[2]));
 
       types.push_back(vector<float>(maxt, 0.0));
       vector<float>& tvec = types.back();
@@ -210,7 +210,7 @@ CoordinateSet Example::merge_coordinates(unsigned start, bool unique_index_types
     return sets[start].clone();
   } else if(!has_vec) {
 
-    vector<float3> coords;
+    vector<Vec3> coords;
     vector<float> types;
     vector<float> radii;
     merge_coordinates(coords, types, radii, start, unique_index_types);
@@ -219,7 +219,7 @@ CoordinateSet Example::merge_coordinates(unsigned start, bool unique_index_types
 
   } else { //vector types
 
-    vector<float3> coords;
+    vector<Vec3> coords;
     vector<vector<float> > types;
     vector<float> radii;
     merge_coordinates(coords, types, radii, start, unique_index_types);

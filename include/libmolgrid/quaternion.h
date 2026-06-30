@@ -137,20 +137,20 @@ class Quaternion {
     }
 
     /// Rotation point (x,y,z) using this quaternion.
-    CUDA_CALLABLE_MEMBER float3 rotate(fl x, fl y, fl z) const {
+    CUDA_CALLABLE_MEMBER Vec3 rotate(fl x, fl y, fl z) const {
       Quaternion p(0, x, y, z);
       p = *this * p * (conj() / norm());
-      return make_float3(p.R_component_2(), p.R_component_3(), p.R_component_4());
+      return make_vec3(p.R_component_2(), p.R_component_3(), p.R_component_4());
     }
 
     /// Rotate around the provided center and translate
-    CUDA_CALLABLE_MEMBER inline float3 transform(fl x, fl y, fl z, float3 center, float3 translate) const {
-      float3 pt = rotate(x - center.x, y - center.y, z - center.z);
+    CUDA_CALLABLE_MEMBER inline Vec3 transform(fl x, fl y, fl z, Vec3 center, Vec3 translate) const {
+      Vec3 pt = rotate(x - center.x, y - center.y, z - center.z);
       x = pt.x + center.x + translate.x;
       y = pt.y + center.y + translate.y;
       z = pt.z + center.z + translate.z;
 
-      return make_float3(x,y,z);
+      return make_vec3(x,y,z);
     }
 
 
