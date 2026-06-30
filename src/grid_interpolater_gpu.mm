@@ -13,26 +13,26 @@
 namespace libmolgrid {
 
 template <typename Dtype>
-void GridInterpolater::forward(float3 in_center,
+void GridInterpolater::forward(Vec3 in_center,
                                 const Grid<Dtype, 4, true>& in,
                                 const Transform& transform,
-                                float3 out_center,
+                                Vec3 out_center,
                                 Grid<Dtype, 4, true>& out) const
 {
     checkGrids(in, out);
-    float3 center    = transform.get_rotation_center();
+    Vec3 center    = transform.get_rotation_center();
     float  in_radius = in_dimension  / 2.0f;
     float  out_radius= out_dimension / 2.0f;
-    float3 in_origin = {in_center.x  - in_radius,
+    Vec3 in_origin = {in_center.x  - in_radius,
                         in_center.y  - in_radius,
                         in_center.z  - in_radius};
-    float3 out_origin= {out_center.x - out_radius,
+    Vec3 out_origin= {out_center.x - out_radius,
                         out_center.y - out_radius,
                         out_center.z - out_radius};
 
     Quaternion invQ  = transform.get_quaternion().inverse();
-    float3 t         = transform.get_translation();
-    float3 untranslate = {-t.x - center.x,
+    Vec3 t         = transform.get_translation();
+    Vec3 untranslate = {-t.x - center.x,
                           -t.y - center.y,
                           -t.z - center.z};
 
@@ -52,8 +52,8 @@ void GridInterpolater::forward(float3 in_center,
     }
 }
 
-template void GridInterpolater::forward(float3,
+template void GridInterpolater::forward(Vec3,
     const Grid<float, 4, true>&, const Transform&,
-    float3, Grid<float, 4, true>&) const;
+    Vec3, Grid<float, 4, true>&) const;
 
 } // namespace libmolgrid

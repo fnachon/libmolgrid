@@ -201,7 +201,7 @@ struct TransformArgs {
 
 void MetalContext::transform_forward(unsigned n,
                                      const QuatParams& Q,
-                                     float3 center, float3 translate,
+                                     Vec3 center, Vec3 translate,
                                      const float* in, float* out,
                                      bool dotranslate)
 {
@@ -226,7 +226,7 @@ void MetalContext::transform_forward(unsigned n,
 
 void MetalContext::transform_backward(unsigned n,
                                       const QuatParams& invQ,
-                                      float3 center, float3 translate,
+                                      Vec3 center, Vec3 translate,
                                       const float* in, float* out,
                                       bool dotranslate)
 {
@@ -333,7 +333,7 @@ struct ForwardArgs {
 };
 
 void MetalContext::forward_index(const GridMakerParams& gm,
-                                 float3 grid_origin,
+                                 Vec3 grid_origin,
                                  const float* coords, unsigned natoms,
                                  const float* type_index,
                                  const float* radii,
@@ -371,7 +371,7 @@ void MetalContext::forward_index(const GridMakerParams& gm,
 }
 
 void MetalContext::forward_vec(const GridMakerParams& gm,
-                               float3 grid_origin,
+                               Vec3 grid_origin,
                                const float* coords, unsigned natoms,
                                const float* type_vector, unsigned ntypes,
                                const float* radii, float maxradius,
@@ -425,7 +425,7 @@ void MetalContext::forward_vec(const GridMakerParams& gm,
 // ---------------------------------------------------------------------------
 
 void MetalContext::backward_index(const GridMakerParams& gm,
-                                  float3 grid_origin,
+                                  Vec3 grid_origin,
                                   const float* coords,
                                   const float* type_index,
                                   const float* radii,
@@ -461,7 +461,7 @@ void MetalContext::backward_index(const GridMakerParams& gm,
 }
 
 void MetalContext::backward_vec(const GridMakerParams& gm,
-                                float3 grid_origin,
+                                Vec3 grid_origin,
                                 const float* coords,
                                 const float* type_vector, unsigned ntypes,
                                 const float* radii,
@@ -511,7 +511,7 @@ void MetalContext::backward_vec(const GridMakerParams& gm,
 }
 
 void MetalContext::backward_gradients(const GridMakerParams& gm,
-                                      float3 grid_origin,
+                                      Vec3 grid_origin,
                                       const float* coords,
                                       const float* type_vector, unsigned ntypes,
                                       const float* radii,
@@ -568,7 +568,7 @@ void MetalContext::backward_gradients(const GridMakerParams& gm,
 }
 
 void MetalContext::backward_relevance(const GridMakerParams& gm,
-                                      float3 grid_origin,
+                                      Vec3 grid_origin,
                                       const float* coords,
                                       const float* type_index,
                                       const float* radii,
@@ -611,11 +611,11 @@ void MetalContext::backward_relevance(const GridMakerParams& gm,
 // ---------------------------------------------------------------------------
 
 void MetalContext::grid_interpolate(const float* in,  unsigned in_dim,
-                                    float3 in_origin,  float in_res,
+                                    Vec3 in_origin,  float in_res,
                                     const QuatParams& invQ,
-                                    float3 untranslate, float3 center,
+                                    Vec3 untranslate, Vec3 center,
                                     float* out, unsigned out_dim,
-                                    float3 out_origin, float out_res)
+                                    Vec3 out_origin, float out_res)
 {
     struct InterpArgs {
         float in_ox, in_oy, in_oz, in_res;

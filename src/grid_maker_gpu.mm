@@ -45,7 +45,7 @@ static GridMakerParams makeParams(const GridMaker& gm) {
 // ===========================================================================
 
 // Helper: run index-type forward into a float buffer, then copy to Dtype if needed.
-static void forward_index_impl(const GridMaker& gm, float3 grid_origin,
+static void forward_index_impl(const GridMaker& gm, Vec3 grid_origin,
                                 const Grid<float,2,true>& coords,
                                 const Grid<float,1,true>& type_index,
                                 const Grid<float,1,true>& radii,
@@ -61,7 +61,7 @@ static void forward_index_impl(const GridMaker& gm, float3 grid_origin,
 }
 
 template <typename Dtype>
-void GridMaker::forward(float3 grid_center,
+void GridMaker::forward(Vec3 grid_center,
                          const Grid<float, 2, true>& coords,
                          const Grid<float, 1, true>& type_index,
                          const Grid<float, 1, true>& radii,
@@ -74,7 +74,7 @@ void GridMaker::forward(float3 grid_center,
     if (dim == 0)
         throw std::invalid_argument("Zero sized grid.");
 
-    float3 grid_origin = get_grid_origin(grid_center);
+    Vec3 grid_origin = get_grid_origin(grid_center);
     out.fill_zero();
     if (coords.dimension(0) == 0) return;
 
@@ -91,9 +91,9 @@ void GridMaker::forward(float3 grid_center,
     }
 }
 
-template void GridMaker::forward(float3, const Grid<float,2,true>&,
+template void GridMaker::forward(Vec3, const Grid<float,2,true>&,
     const Grid<float,1,true>&, const Grid<float,1,true>&, Grid<float,4,true>&) const;
-template void GridMaker::forward(float3, const Grid<float,2,true>&,
+template void GridMaker::forward(Vec3, const Grid<float,2,true>&,
     const Grid<float,1,true>&, const Grid<float,1,true>&, Grid<double,4,true>&) const;
 
 // Batched overloads delegate to the single-example overload (loop on CPU).
@@ -114,7 +114,7 @@ template void GridMaker::forward<double,3,true>(const Grid<float,2,true>&,
 // Forward  –  Vector types
 // ===========================================================================
 
-static void forward_vec_impl(const GridMaker& gm, float3 grid_origin,
+static void forward_vec_impl(const GridMaker& gm, Vec3 grid_origin,
                               const Grid<float,2,true>& coords,
                               const Grid<float,2,true>& type_vector,
                               const Grid<float,1,true>& radii, float maxr,
@@ -131,14 +131,14 @@ static void forward_vec_impl(const GridMaker& gm, float3 grid_origin,
 }
 
 template <typename Dtype>
-void GridMaker::forward(float3 grid_center,
+void GridMaker::forward(Vec3 grid_center,
                          const Grid<float, 2, true>& coords,
                          const Grid<float, 2, true>& type_vector,
                          const Grid<float, 1, true>& radii,
                          Grid<Dtype, 4, true>& out) const
 {
     check_vector_args(coords, type_vector, radii, out);
-    float3 grid_origin = get_grid_origin(grid_center);
+    Vec3 grid_origin = get_grid_origin(grid_center);
 
     out.fill_zero();
     if (coords.dimension(0) == 0) return;
@@ -161,9 +161,9 @@ void GridMaker::forward(float3 grid_center,
     }
 }
 
-template void GridMaker::forward(float3, const Grid<float,2,true>&,
+template void GridMaker::forward(Vec3, const Grid<float,2,true>&,
     const Grid<float,2,true>&, const Grid<float,1,true>&, Grid<float,4,true>&) const;
-template void GridMaker::forward(float3, const Grid<float,2,true>&,
+template void GridMaker::forward(Vec3, const Grid<float,2,true>&,
     const Grid<float,2,true>&, const Grid<float,1,true>&, Grid<double,4,true>&) const;
 
 // ===========================================================================
@@ -171,7 +171,7 @@ template void GridMaker::forward(float3, const Grid<float,2,true>&,
 // ===========================================================================
 
 template <typename Dtype>
-void GridMaker::backward(float3 grid_center,
+void GridMaker::backward(Vec3 grid_center,
                           const Grid<float, 2, true>& coords,
                           const Grid<float, 1, true>& type_index,
                           const Grid<float, 1, true>& radii,
@@ -192,7 +192,7 @@ void GridMaker::backward(float3 grid_center,
         throw std::invalid_argument("Type indexed radii not supported with index types.");
 
     if (n == 0) return;
-    float3 grid_origin = get_grid_origin(grid_center);
+    Vec3 grid_origin = get_grid_origin(grid_center);
 
     MetalContext::instance().backward_index(
         makeParams(*this), grid_origin,
@@ -202,10 +202,10 @@ void GridMaker::backward(float3 grid_center,
         n, grid.dimension(0), dim);
 }
 
-template void GridMaker::backward(float3, const Grid<float,2,true>&,
+template void GridMaker::backward(Vec3, const Grid<float,2,true>&,
     const Grid<float,1,true>&, const Grid<float,1,true>&,
     const Grid<float,4,true>&, Grid<float,2,true>&) const;
-template void GridMaker::backward(float3, const Grid<float,2,true>&,
+template void GridMaker::backward(Vec3, const Grid<float,2,true>&,
     const Grid<float,1,true>&, const Grid<float,1,true>&,
     const Grid<double,4,true>&, Grid<double,2,true>&) const;
 
@@ -214,7 +214,7 @@ template void GridMaker::backward(float3, const Grid<float,2,true>&,
 // ===========================================================================
 
 template <typename Dtype>
-void GridMaker::backward(float3 grid_center,
+void GridMaker::backward(Vec3 grid_center,
                           const Grid<float, 2, true>& coords,
                           const Grid<float, 2, true>& type_vector,
                           const Grid<float, 1, true>& radii,
@@ -249,7 +249,7 @@ void GridMaker::backward(float3 grid_center,
     }
 
     if (n == 0) return;
-    float3 grid_origin = get_grid_origin(grid_center);
+    Vec3 grid_origin = get_grid_origin(grid_center);
 
     MetalContext::instance().backward_vec(
         makeParams(*this), grid_origin,
@@ -260,7 +260,7 @@ void GridMaker::backward(float3 grid_center,
         n, dim, radii_type_indexed);
 }
 
-template void GridMaker::backward(float3, const Grid<float,2,true>&,
+template void GridMaker::backward(Vec3, const Grid<float,2,true>&,
     const Grid<float,2,true>&, const Grid<float,1,true>&,
     const Grid<float,4,true>&, Grid<float,2,true>&, Grid<float,2,true>&) const;
 
@@ -269,7 +269,7 @@ template void GridMaker::backward(float3, const Grid<float,2,true>&,
 // ===========================================================================
 
 template <typename Dtype>
-void GridMaker::backward_gradients(float3 grid_center,
+void GridMaker::backward_gradients(Vec3 grid_center,
                                     const Grid<float, 2, true>& coords,
                                     const Grid<float, 2, true>& type_vector,
                                     const Grid<float, 1, true>& radii,
@@ -291,7 +291,7 @@ void GridMaker::backward_gradients(float3 grid_center,
     diffdiff.fill_zero();
 
     if (n == 0) return;
-    float3 grid_origin = get_grid_origin(grid_center);
+    Vec3 grid_origin = get_grid_origin(grid_center);
 
     MetalContext::instance().backward_gradients(
         makeParams(*this), grid_origin,
@@ -305,7 +305,7 @@ void GridMaker::backward_gradients(float3 grid_center,
         n, dim, radii_type_indexed);
 }
 
-template void GridMaker::backward_gradients(float3,
+template void GridMaker::backward_gradients(Vec3,
     const Grid<float,2,true>&, const Grid<float,2,true>&,
     const Grid<float,1,true>&, const Grid<float,4,true>&,
     const Grid<float,2,true>&, const Grid<float,2,true>&,
@@ -316,7 +316,7 @@ template void GridMaker::backward_gradients(float3,
 // ===========================================================================
 
 template <typename Dtype>
-void GridMaker::backward_relevance(float3 grid_center,
+void GridMaker::backward_relevance(Vec3 grid_center,
                                     const Grid<float, 2, true>& coords,
                                     const Grid<float, 1, true>& type_index,
                                     const Grid<float, 1, true>& radii,
@@ -334,7 +334,7 @@ void GridMaker::backward_relevance(float3 grid_center,
         throw std::invalid_argument("Radii dimension doesn't equal number of coordinates");
     if (n == 0) return;
 
-    float3 grid_origin = get_grid_origin(grid_center);
+    Vec3 grid_origin = get_grid_origin(grid_center);
 
     MetalContext::instance().backward_relevance(
         makeParams(*this), grid_origin,
@@ -345,7 +345,7 @@ void GridMaker::backward_relevance(float3 grid_center,
         n, density.dimension(0), dim);
 }
 
-template void GridMaker::backward_relevance(float3,
+template void GridMaker::backward_relevance(Vec3,
     const Grid<float,2,true>&, const Grid<float,1,true>&,
     const Grid<float,1,true>&, const Grid<float,4,true>&,
     const Grid<float,4,true>&, Grid<float,1,true>&) const;
