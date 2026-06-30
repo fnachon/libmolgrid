@@ -75,14 +75,19 @@ namespace libmolgrid
       gpu_info->gpu_ptr = nullptr;
       gpu_info->sent_to_gpu = false;
 #else
+      // The data must start exactly at the page-aligned base address (rather
+      // than just after a header struct) so it can be wrapped zero-copy in
+      // an MTLBuffer for the Metal backend, which requires page-aligned
+      // pointers. So the (tiny) header trails the data instead of leading
+      // it, unlike the CUDA branch above.
       const size_t align = 16384;
-      const size_t bytes = sizeof(buffer_data) + sz * sizeof(Dtype);
+      const size_t bytes = sz * sizeof(Dtype) + sizeof(buffer_data);
       void *buffer = nullptr;
       if (posix_memalign(&buffer, align, bytes) != 0 || !buffer)
         throw std::runtime_error("Could not allocate " + itoa(sz * sizeof(Dtype)) + " bytes of CPU memory in ManagedGrid");
-      gpu_info = static_cast<buffer_data *>(buffer);
+      Dtype *cpu_data = static_cast<Dtype *>(buffer);
+      gpu_info = reinterpret_cast<buffer_data *>(cpu_data + sz);
       gpu_info->sent_to_gpu = false;
-      Dtype *cpu_data = reinterpret_cast<Dtype *>(gpu_info + 1);
       cpu_ptr = std::shared_ptr<Dtype>(cpu_data, [buffer](Dtype *) { ManagedGridBase<Dtype, NumDims>::delete_buffer(buffer); });
       cpu_grid.set_buffer(cpu_ptr.get());
       gpu_grid.set_buffer(cpu_ptr.get());

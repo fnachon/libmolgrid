@@ -58,17 +58,31 @@ set( PYMOLGRID_PY
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/molgrid/")
 
 # link
+# On macOS, Python extension modules must not link libpython directly:
+# some distributions (e.g. conda's python) statically embed the
+# interpreter in the executable rather than exposing libpython as a
+# shared library, so linking against libpythonX.Y.dylib pulls in a
+# second, independent copy of the CPython runtime and crashes at
+# import time. Resolve Python symbols against the running process
+# instead, as distutils/setuptools do.
+if(APPLE)
+  set(PYMOLGRID_PYTHON_LINK_LIBS)
+  add_link_options("LINKER:-undefined,dynamic_lookup")
+else()
+  set(PYMOLGRID_PYTHON_LINK_LIBS ${PYTHON_LIBRARY})
+endif()
+
 if(BUILD_CONTAINED_PYTHON)
   # create a python library with as few runtime dependencies as possible
   add_link_options("LINKER:--exclude-libs,ALL")  # avoid exporting stdc++ symbols
   add_library(molgrid SHARED ${PYMOLGRID_SOURCES})
-  target_link_libraries(molgrid ${Boost_LIBRARIES} ${PYTHON_LIBRARY}
+  target_link_libraries(molgrid ${Boost_LIBRARIES} ${PYMOLGRID_PYTHON_LINK_LIBS}
       ${CUDA_LIBRARIES} ${METAL_FRAMEWORK} ${FOUNDATION_FRAMEWORK} libmolgrid_static
       -static-libstdc++ -static-libgcc)
 else()
 # create the lib
   add_library(molgrid SHARED ${PYMOLGRID_SOURCES})
-  target_link_libraries(molgrid ${Boost_LIBRARIES} ${PYTHON_LIBRARY}
+  target_link_libraries(molgrid ${Boost_LIBRARIES} ${PYMOLGRID_PYTHON_LINK_LIBS}
       ${CUDA_LIBRARIES} ${METAL_FRAMEWORK} ${FOUNDATION_FRAMEWORK} libmolgrid_shared)
 endif()
 
