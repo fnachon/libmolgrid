@@ -101,7 +101,7 @@ namespace libmolgrid
         throw std::runtime_error("Attempt to allocate gpu memory in empty ManagedGrid");
       if (gpu_info->gpu_ptr != nullptr)
         throw std::runtime_error("Attempt to reallocate gpu memory in ManagedGrid");
-      cudaError_t err = cudaMalloc(&gpu_info->gpu_ptr, sz * sizeof(Dtype));
+      cudaError_t err = cudaMalloc(reinterpret_cast<void**>(&gpu_info->gpu_ptr), sz * sizeof(Dtype));
       cudaGetLastError();
       if (err != cudaSuccess)
         throw std::runtime_error("Could not allocate " + itoa(sz * sizeof(Dtype)) + " bytes of GPU memory in ManagedGrid");

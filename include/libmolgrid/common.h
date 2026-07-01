@@ -41,7 +41,11 @@ inline UVec2 make_uvec2(unsigned x, unsigned y) { return {x, y}; }
 #if LIBMOLGRID_USE_CUDA
 // Conversion at the host/device kernel-launch boundary: CUDA kernels still
 // take native ::float3 (the real, hardware-recognized CUDA vector type).
-inline ::float3 to_cuda(Vec3 v) { return make_float3(v.x, v.y, v.z); }
+// Built via aggregate init rather than make_float3() so this compiles from
+// plain .cpp translation units too, not just .cu ones: make_float3 lives in
+// <vector_functions.h>, which nvcc implicitly includes for .cu files but
+// which isn't pulled in here for a host-only g++ compile.
+inline ::float3 to_cuda(Vec3 v) { return ::float3{v.x, v.y, v.z}; }
 #endif
 
 #if LIBMOLGRID_USE_CUDA
