@@ -442,20 +442,15 @@ BOOST_AUTO_TEST_CASE(forward_vec) {
 
   g.forward(Vec3{0,0,0}, coords, out.cpu());
   g.forward(Vec3{0,0,0}, coords, out2.gpu());
+  out2.tocpu(); //on CUDA, gpu() and cpu() are backed by separate buffers;
+                //data() doesn't sync, so pull the GPU results back first.
 
   unsigned sz = out.size();
   float *g1 = out.data();
   float *g2 = out2.data();
   float max = 0;
-  // CPU and GPU both call the same calc_point(), but the device and host
-  // exp() implementations aren't bit-identical. This grid is only 0.1A
-  // resolution around a single atom, so many voxels sample close to the
-  // Gaussian's peak, where that divergence is largest in absolute terms;
-  // TOL is too tight for that here even though it holds for the coarser,
-  // more spread-out multi-atom CPU/GPU comparison in forward_agreement.
-  const float GPU_TOL = 20 * TOL;
   for(unsigned i = 0; i < sz; i++) {
-    BOOST_CHECK_SMALL(g1[i] - g2[i], GPU_TOL);
+    BOOST_CHECK_SMALL(g1[i] - g2[i], TOL);
     if(g1[i] > max) max = g1[i];
   }
   BOOST_CHECK_EQUAL(max, .5); //make sure not zero
@@ -500,7 +495,8 @@ BOOST_AUTO_TEST_CASE(forward_vec_types) {
   //check gpu code
   outt.fill_zero();
   gt.forward(Vec3{0,0,0}, coordst, outt.gpu());
-  Gt = outt.data(); //bring back to cpu
+  outt.tocpu(); //bring back to cpu; data() alone does not sync
+  Gt = outt.data();
   for(unsigned i = 0; i < sz; i++) {
     BOOST_CHECK_SMALL(Ga[i] - Gt[i], TOL);
   }
