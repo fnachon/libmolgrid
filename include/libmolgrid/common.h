@@ -35,8 +35,8 @@
 struct Vec3 { float x, y, z; };
 struct UVec2 { unsigned int x, y; };
 
-inline Vec3 make_vec3(float x, float y, float z) { return {x, y, z}; }
-inline UVec2 make_uvec2(unsigned x, unsigned y) { return {x, y}; }
+CUDA_CALLABLE_MEMBER inline Vec3 make_vec3(float x, float y, float z) { return {x, y, z}; }
+CUDA_CALLABLE_MEMBER inline UVec2 make_uvec2(unsigned x, unsigned y) { return {x, y}; }
 
 #if LIBMOLGRID_USE_CUDA
 // Conversion at the host/device kernel-launch boundary: CUDA kernels still
