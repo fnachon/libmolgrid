@@ -143,8 +143,9 @@ BOOST_AUTO_TEST_CASE(forward_gpu) {
   Vec3 grid_dims = gmaker.get_grid_dims();
   MGrid4f out(ntypes, grid_dims.x, grid_dims.y, grid_dims.z);
   Grid4fCUDA gpu_grid = out.gpu();
-  size_t gsize = grid_dims.x * grid_dims.y * grid_dims.z * ntypes;
-  memset(gpu_grid.data(), 0, gsize * sizeof(float));
+  // GridMaker::forward() cudaMemsets the output grid itself before writing
+  // to it, so no need to (and, since gpu_grid.data() is device memory, no
+  // safe way to) pre-zero it with a host-side memset() here.
   gmaker.forward(grid_center, coordgpu, gpu_grid);
   out.tocpu();
 
